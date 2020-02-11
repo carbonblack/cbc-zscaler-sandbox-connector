@@ -31,7 +31,7 @@ Edit the `config.conf` file and update with your configurations
 
 ### Configuration
 
-All of the configurable settings for the integration can be found in `config.ini`.
+All of the configurable settings for the integration can be found in `config.conf`.
 
 Here is a [link]() to a sample config file with dummy creds. Below is a table explaining each section and option in the config file.
 
