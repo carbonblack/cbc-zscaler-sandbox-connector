@@ -33,7 +33,7 @@ Edit the `config.conf` file and update with your configurations
 
 All of the configurable settings for the integration can be found in `config.conf`.
 
-Here is a [link]() to a sample config file with dummy creds. Below is a table explaining each section and option in the config file.
+Here is a [link](https://github.com/carbonblack/cbc-zscaler-sandbox-connector/blob/master/sample/config.conf) to a sample config file with dummy creds. Below is a table explaining each section and option in the config file.
 
 | CarbonBlack      | Configure Carbon Black Cloud       |
 |:-----------------|:-----------------------------------|
