@@ -35,13 +35,8 @@ All of the configurable settings for the integration can be found in `config.con
 
 Here is a [link]() to a sample config file with dummy creds. Below is a table explaining each section and option in the config file.
 
-
-#### Carbon Black
-
-VMware Carbon Black Cloud is going through an API migration. For now there are several types of API keys required.
-
-| CarbonBlack      | Configure CBC                      |
-|------------------|------------------------------------|
+| CarbonBlack      | Configure Carbon Black Cloud       |
+|:-----------------|:-----------------------------------|
 | `url`            | URL of CBC instance                |
 | `api_id`         | API ID                             |
 | `api_key`        | API Secret Secret Key              |
@@ -53,44 +48,17 @@ VMware Carbon Black Cloud is going through an API migration. For now there are s
 | `filters`        | What reputation types to filter on |
 | `cbd_enabled`    | Enable CBC Endpoint Standard?      |
 | `cbth_enabled`   | Enable CBC Enterprise EDR?         |
-
-> **Note:** `filters` is a comma delimited list of file reputations. Options are:
-> - NOT_LISTED
-> - ...
-> - ...
-> `cbd_enabled` and `cbth_enabled` are boolean values. Set to True/False/1/0
-
-#### Zscaler
-
-Zscaler requires an API key and user/pass for authentication.
-
-| Zscaler          | Configure Zscaler ZIA Access       |
-|------------------|------------------------------------|
+| **Zscaler**      | **Configure Zscaler ZIA Access**   |
 | `url`            | URL for Zscaler ZIA                |
 | `api_key`        | API Key                            |
 | `username`       | Login Username                     |
 | `password`       | Login Password                     |
 | `bad_types`      | Bad Types in Sandbox Reports       |
-
-> **Note:** `bad_types` is a comma delimited list of categories from Zscaler. Default are `MALICIOUS` and `SUSPICIOUS`.
-
-
-#### sqlite3
-
-All hashes are saved in a local sqlite3 database to prevent duplication of effort.
-
-| sqlite3          | Configure sqlite3                  |
-|------------------|------------------------------------|
+| **sqlite3**      | **Configure sqlite3**              |
 | `filename`       | Filename of the sqlite3 database   |
-
-#### Actions
-
-Actions are what occurs when a malicious hash is detected
-
-| actions     | Configure Actions                                                |
-|-------------|------------------------------------------------------------------|
-| `watchlist` | Name of watchlist to populate                                    |
-| `webhook`   | URL to POST a JSON object of the even/process and sandbox report |
-| `script`    | A script to execute                                              |
-| `isolate`   | Isolate the endpoint?                                            |
-| `policy`    | Policy to move offending devices                                 |
+| **actions**      | **Configure Actions**              |
+| `watchlist`      | Name of watchlist to populate      |
+| `webhook`        | URL to POST a JSON object of the even/process and sandbox report |
+| `script`         | A script to execute                |
+| `isolate`        | Isolate the endpoint?              |
+| `policy`         | Policy to move offending devices   |
