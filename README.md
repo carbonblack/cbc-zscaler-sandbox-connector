@@ -17,6 +17,8 @@ Action options consist of:
     - Python 3.x
     - Internet connection
 
+----
+
 ## Installation
 
 Clone the repository into a local folder.
@@ -64,10 +66,10 @@ Zscaler requires an API key and user/pass for authentication.
 
 | Zscaler          | Configure Zscaler ZIA Access       |
 |------------------|------------------------------------|
-| url              | URL for Zscaler ZIA                |
-| api_key          | API Key                            |
-| username         | Login Username                     |
-| password         | Login Password                     |
+| `url`            | URL for Zscaler ZIA                |
+| `api_key`        | API Key                            |
+| `username`       | Login Username                     |
+| `password`       | Login Password                     |
 | `bad_types`      | Bad Types in Sandbox Reports       |
 
 > **Note:** `bad_types` is a comma delimited list of categories from Zscaler. Default are `MALICIOUS` and `SUSPICIOUS`.
@@ -79,16 +81,16 @@ All hashes are saved in a local sqlite3 database to prevent duplication of effor
 
 | sqlite3          | Configure sqlite3                  |
 |------------------|------------------------------------|
-| filename         | Filename of the sqlite3 database   |
+| `filename`       | Filename of the sqlite3 database   |
 
 #### Actions
 
 Actions are what occurs when a malicious hash is detected
 
-| actions   | Configure Actions                                                |
-|-----------|------------------------------------------------------------------|
-| watchlist | Name of watchlist to populate                                    |
-| webhook   | URL to POST a JSON object of the even/process and sandbox report |
-| script    | A script to execute                                              |
-| isolate   | Isolate the endpoint?                                            |
-| policy    | Policy to move offending devices                                 |
+| actions     | Configure Actions                                                |
+|-------------|------------------------------------------------------------------|
+| `watchlist` | Name of watchlist to populate                                    |
+| `webhook`   | URL to POST a JSON object of the even/process and sandbox report |
+| `script`    | A script to execute                                              |
+| `isolate`   | Isolate the endpoint?                                            |
+| `policy`    | Policy to move offending devices                                 |

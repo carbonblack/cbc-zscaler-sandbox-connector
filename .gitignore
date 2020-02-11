@@ -12,3 +12,4 @@ __pycache__/
 # Integration specific
 *.sql
 app.log
+todo.txt
