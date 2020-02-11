@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is an integration between Zscaler's ZIA Sandbox and VMware's Carbon Black Cloud (CBC) Endpoint Standard and CBC Enterprise EDR. While Zscaler can scan all filees before they reach the endpoint if they come through the network, what happens when a file comes in via another method, or prior to sensor installation?
+This is an integration between Zscaler's ZIA Sandbox and VMware's Carbon Black Cloud (CBC) Endpoint Standard and CBC Enterprise EDR. While Zscaler can scan all files before they reach the endpoint if they come through the network, what happens when a file comes in via another method, or prior to sensor installation?
 
 The connector will scan on a regular interval for any CBC Enterprise Standard events or CBC Enterprise EDR processes. After pulling the processes it checks all of the unique hashes against a database of files that have been checked in the past. If the file is not known, a request to Zscaler's ZIA Sandbox is made to see if they have any information on it. If they do, or if the file is known bad from the local database, action is taken.
 
