@@ -1,14 +1,11 @@
 import os
-import sys
 import json
-import hashlib
-import validators
 
 import sqlite3
 from sqlite3 import Error
 
 import time
-from time import gmtime, strftime, sleep
+from time import sleep
 from datetime import datetime, timedelta
 
 import requests
@@ -20,12 +17,13 @@ from cbapi.psc.models import BaseAlert
 
 # Import Defense
 from cbapi.psc.defense import CbDefenseAPI
-from cbapi.psc.defense.models import Event
+from cbapi.psc.defense.models import Event, Device
 
 # Import ThreatHunter
 from cbapi.psc.threathunter import CbThreatHunterAPI
-from cbapi.psc.threathunter import Process, Binary
+from cbapi.psc.threathunter import Process
 from cbapi.psc.threathunter.models import Feed, Report
+
 
 class CarbonBlack:
     '''
@@ -62,7 +60,7 @@ class CarbonBlack:
         self.cbd = CbDefenseAPI(url=self.url, org_key=self.org_key,
                                 token='{0}/{1}'.format(self.api_key, self.api_id))
         self.cbth = CbThreatHunterAPI(url=self.url, org_key=self.org_key,
-                                token='{0}/{1}'.format(self.cust_api_key, self.cust_api_id))
+                                      token='{0}/{1}'.format(self.cust_api_key, self.cust_api_id))
         # self.minimum_severity = int(config['CarbonBlack']['minimum_severity'])
         self.time_bounds = None
         self.device_id = None
@@ -96,7 +94,7 @@ class CarbonBlack:
         return alerts
 
     def get_device(self, device_id):
-        return cb.cbd.select(Device).where('device_id:{0}'.format(device_id)).first()
+        return self.cbd.select(Device).where('device_id:{0}'.format(device_id)).first()
 
     def isolate_device(self, device_id):
         devices = self.get_device(device_id)
@@ -133,7 +131,7 @@ class CarbonBlack:
         # events = self.cbd.select(Event).where('searchWindow:3h')
         # return events
 
-        total_results = rows +1
+        total_results = rows + 1
         unique_events = []
         event_tracking = []
 
@@ -216,7 +214,6 @@ class CarbonBlack:
         self.log.info('[%s] Found {0} events with sha256 {1}'.format(len(events), sha256))
         return events
 
-
     #
     # CBC Enterprise EDR
     #
@@ -241,7 +238,8 @@ class CarbonBlack:
         data = r.json()['time_bounds']
 
         self.log.info('[%s] Available time range is from {0} to {1}'.format(convert_time(data['lower']),
-                                                                             convert_time(data['upper'])), self.class_name)
+                                                                            convert_time(data['upper'])),
+                      self.class_name)
 
         self.time_bounds = data
 
@@ -269,11 +267,8 @@ class CarbonBlack:
         # For filtering unique processes (hashes)
         unique_procs = []
 
-        # Set a temp value to get into the while loop
-        max_results = rows +1
-
         # Paginate through the processes
-        procs = self.cbth.select(Process).where(query) # .sort_by('first_event_time', 'DESC') # !!! need to figure out how to sort these
+        procs = self.cbth.select(Process).where(query)  # .sort_by('first_event_time', 'DESC') # !!! need to figure out how to sort these
 
         # query.sort_by('first_event_time', 'DESC')
         for process in procs:
@@ -284,6 +279,10 @@ class CarbonBlack:
 
             # Get the raw JSON
             raw_proc = process.original_document
+
+            if 'process_hash' not in raw_proc:
+                self.log.info('[%s] Process is missing MD5 and SHA256. Skipping.', self.class_name)
+                continue
 
             if len(raw_proc['process_hash']) == 1:
                 if len(raw_proc['process_hash'][0]) == 32:
@@ -296,7 +295,7 @@ class CarbonBlack:
                     raw_proc['sha256'] = raw_proc['process_hash'][0]
                     metadata = self.ubs_get_metadata(raw_proc['process_hash'][0])
 
-                    if metadata != None:
+                    if metadata is not None:
                         raw_proc['md5'] = metadata['md5']
 
                     else:
@@ -313,31 +312,6 @@ class CarbonBlack:
 
         self.log.info('[%s] Found {0} unique processes'.format(len(processes)), self.class_name)
         return processes
-
-    def ubs_get_file(self, sha256):
-        '''
-            Gets the raw binary from Enterprise EDR UBS
-
-            Inputs:
-                sha256: The hash of the file to pull
-
-            Outputs:
-                The raw binary of the file being pulled
-        '''
-
-        self.log.info('[%s] Getting UBS file: {0}'.format('sha256'), self.class_name)
-
-        endpoint = '{url}/ubs/v1/orgs/{org_key}/file/_download'.format(url=self.url,
-                                                                       org_key=self.org_key)
-        data = {
-            'sha256': [sha256],
-            'expiration_seconds': 600
-        }
-        headers = {
-            'X-Auth-Token': '{api_key}/{api_id}'.format(api_key=self.api_key,
-                                                        api_id=self.api_id)
-        }
-        r = requests.post(url=endpoint, headers=headers, data=data)
 
     def ubs_get_metadata(self, sha256):
         '''
@@ -402,11 +376,11 @@ class CarbonBlack:
 
         self.log.info('[%s] Getting feed: {0}'.format(feed_id), self.class_name)
 
-        if feed_id == None and feed_name == None:
+        if feed_id is None and feed_name is None:
             self.log.info('[%s] Missing feed_id and feed_name. Need at least one', self.class_name)
             return None
 
-        if feed_id != None and feed_name != None:
+        if feed_id is not None and feed_name is not None:
             self.log.info('[%s] Both feed_id and feed_name provided. Please only provide one', self.class_name)
             return None
 
@@ -417,7 +391,7 @@ class CarbonBlack:
         #     return None
 
         # If the feed_name was provided, get all the feeds and check their names
-        if feed_name != None:
+        if feed_name is not None:
             feeds = self.get_all_feeds()
             for feed in feeds:
                 if feed.name == feed_name:
@@ -427,7 +401,7 @@ class CarbonBlack:
         self.log.info('feed_id: {0}'.format(feed_id))
 
         # If no feeds were found, return None
-        if feed_id == None:
+        if feed_id is None:
             return None
 
         feed = self.cbth.select(Feed, feed_id)
@@ -463,7 +437,7 @@ class CarbonBlack:
             "reports": [report]
         }
 
-        feed = cb.create(Feed, feed)
+        feed = self.cbth.create(Feed, feed)
         feed.save()
 
         return feed
@@ -499,14 +473,13 @@ class CarbonBlack:
             }]
         }
 
-        report = cb.create(Report, report)
+        report = self.cbth.create(Report, report)
 
         self.log.info(report)
         return report
 
-    def update_feed(self, feed, report):
+    def update_feed(self, feed_id, report):
         self.log.info('[%s] Updating feed: {0}'.format(feed_id), self.class_name)
-
 
     #
     # CBC Live Response helpers
@@ -526,7 +499,7 @@ class CarbonBlack:
 
         self.log.info('[%s] Starting LR session', self.class_name)
         url = '{0}/integrationServices/v3/cblr/session/{1}'.format(self.url, device_id)
-        params = { 'wait': wait }
+        params = {'wait': wait}
         headers = {
             'Content-Type': 'application/json',
             'X-Auth-Token': '{0}/{1}'.format(self.lr_api_key, self.lr_api_id)
@@ -556,8 +529,9 @@ class CarbonBlack:
                 Returns the raw JSON of the request
         '''
 
-        if self.session_id == None:
-            self.log.info('[%s] Cannot get session status. No session established'.format(self.session_id), self.class_name)
+        if self.session_id is None:
+            self.log.info('[%s] Cannot get session status. No session established'.format(self.session_id),
+                          self.class_name)
             return 'No session established'
 
         self.log.info('[%s] Getting status of session: {0}'.format(self.session_id), self.class_name)
@@ -592,7 +566,7 @@ class CarbonBlack:
 
         self.log.info('[%s] Sending command to LR session: {0}'.format(command), self.class_name)
 
-        if self.session_id == None:
+        if self.session_id is None:
             self.log.info('Error: no session')
             return 'Error: no session'
 
@@ -607,8 +581,8 @@ class CarbonBlack:
         }
 
         body = {
-        	"session_id": self.session_id,
-        	"name": command
+            'session_id': self.session_id,
+            'name': command
         }
         if argument is not None:
             body['object'] = argument
@@ -633,8 +607,9 @@ class CarbonBlack:
 
         self.log.info('[%s] Getting status of LR command: {0}'.format(command_id), self.class_name)
 
-        if self.session_id == None:
-            self.log.info('[%s] Cannot get session status. No session established'.format(self.session_id), self.class_name)
+        if self.session_id is None:
+            self.log.info('[%s] Cannot get session status. No session established'.format(self.session_id),
+                          self.class_name)
             return 'No session established'
 
         self.log.info('[%s] Getting status of command: {0}'.format(command_id), self.class_name)
@@ -669,7 +644,7 @@ class CarbonBlack:
 
         self.log.info('[%s] Closing session: {0}'.format(self.session_id), self.class_name)
 
-        if self.session_id == None:
+        if self.session_id is None:
             self.log.info('Error: no session')
             return 'Error: no session'
 
@@ -680,8 +655,8 @@ class CarbonBlack:
         }
 
         body = {
-        	"session_id": self.session_id,
-        	"status": 'CLOSE'
+            'session_id': self.session_id,
+            'status': 'CLOSE'
         }
 
         r = requests.put(url, headers=headers, json=body)
@@ -890,12 +865,12 @@ class Database:
                         or ISO8601 format (str)
 
             Output:
-                Returns the last pull timestamp from the database if timestamp == None
+                Returns the last pull timestamp from the database if timestamp is None
                 Returns the database response if timestamp == epoch or ISO8601
         '''
 
         # Get or set last pull timestamp
-        if timestamp == None:
+        if timestamp is None:
             self.log.info('[%s] Getting last pull', self.class_name)
             sql = 'SELECT timestamp FROM alerts WHERE id = 1'
             cursor = self.conn.cursor()
@@ -971,7 +946,7 @@ class Zscaler:
             key += seed[int(str(n)[i])]
 
         for j in range(0, len(str(r)), 1):
-            key += seed[int(str(r)[j])+2]
+            key += seed[int(str(r)[j]) + 2]
 
         return now, key
 
@@ -992,10 +967,10 @@ class Zscaler:
         url = '{}/api/v1/authenticatedSession'.format(self.url)
         headers = self.headers
         data = {
-             "username": self.username,
-             "password": self.password,
-             "apiKey": obf_api_key,
-             "timestamp": str(timestamp)
+            'username': self.username,
+            'password': self.password,
+            'apiKey': obf_api_key,
+            'timestamp': str(timestamp)
         }
 
         self.session = s = requests.Session()
@@ -1026,13 +1001,13 @@ class Zscaler:
 
         self.log.info('[%s] Checking file: {}'.format(md5), self.class_name)
 
-        if self.quota == None:
+        if self.quota is None:
             self.get_quota()
 
         if self.quota['unused'] == 0:
-            self.log.info('[%s] All queries for the day have been used. Max is {0}'.format(self.quota['allowed']), self.class_name)
+            self.log.info('[%s] All queries for the day have been used. Max is {0}'.format(self.quota['allowed']),
+                          self.class_name)
             return False
-
 
         # Zscaler throttles to 2 requests per second
         sleep(0.5)
@@ -1049,7 +1024,8 @@ class Zscaler:
 
             # Output a warning on low request counts remaining
             if self.quota['unused'] < 100:
-                self.log.info('[%s] There are only {0} sandbox queries remaining'.format(self.quota['unused']), self.class_name)
+                self.log.info('[%s] There are only {0} sandbox queries remaining'.format(self.quota['unused']),
+                              self.class_name)
 
             # If the response's Summary is a string, it's not a report
             zs_report = None if isinstance(r.json()['Summary'], str) else r.json()
@@ -1079,7 +1055,7 @@ class Zscaler:
 
         self.log.info('[%s] Getting qouota', self.class_name)
 
-        if self.session == None:
+        if self.session is None:
             self.start_session()
 
         # Get the report
@@ -1092,8 +1068,8 @@ class Zscaler:
             data = r.json()[0]
             self.quota = data
             self.log.info('[%s] Quota used: {0} unused: {1} allowed: {2}'.format(data['used'],
-                                                                              data['unused'],
-                                                                              data['allowed']), self.class_name)
+                                                                                 data['unused'],
+                                                                                 data['allowed']), self.class_name)
 
 
 def convert_time(timestamp):

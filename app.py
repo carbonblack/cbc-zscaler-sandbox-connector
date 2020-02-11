@@ -4,7 +4,8 @@ import subprocess
 import logging as log
 import json
 import os
-
+import requests
+from datetime import datetime
 
 # Import helpers
 from lib.helpers import *
@@ -33,14 +34,14 @@ def init():
 
     # Configure logging
     log.basicConfig(filename='app.log', format='[%(asctime)s] <pid:%(process)d> %(message)s', level=log.DEBUG)
-    log.info('[APP.PY] Sarted <!!!name of integration here...!!!>')
+    log.info('[APP.PY] Sarted Zscaler ZIA Sandbox Connector for VMware Carbon Black Cloud')
 
     # Get setting from config.ini
     config = configparser.ConfigParser()
     config.read('config.conf')
 
     # Configure CLI input arguments
-    parser = argparse.ArgumentParser(description='Description of the app here...')
+    parser = argparse.ArgumentParser(description='Get events / processes from VMware Carbon Black Cloud')
     parser.add_argument('--last_pull', help='Set the last pull time in ISO8601 format')
     args = parser.parse_args()
 
@@ -58,6 +59,7 @@ def init():
 
     return config, db, cb, zs
 
+
 def take_action(cb_event, zs_report):
     # Populate actions with either None or the action defined
     actions = {}
@@ -68,7 +70,7 @@ def take_action(cb_event, zs_report):
             actions[action] = config['actions'][action]
 
     # Create/update watchlist feed
-    if actions['watchlist'] != None:
+    if actions['watchlist'] is not None:
         report = cb.create_report(
             zs_report['timestamp'],
             zs_report['title'],
@@ -79,19 +81,19 @@ def take_action(cb_event, zs_report):
             zs_report['md5']
         )
 
-        feed = cb.get_feed(feed_name=watchlist)
-        if feed == None:
+        feed = cb.get_feed(feed_name=actions['watchlist'])
+        if feed is None:
             feed = cb.create_feed(
-                watchlist,
+                actions['watchlist'],
                 config['Zscaler']['url'],
                 'Found Reports from Zscaler ZIA Sandbox',
                 report
             )
         else:
-            update_feed(feed, report)
+            cb.update_feed(feed, report)
 
     # Send data to webhook
-    if actions['webhook'] != None:
+    if actions['webhook'] is not None:
         url = actions['webhook']
         headers = {
             'Content-Type': 'application/json'
@@ -100,10 +102,10 @@ def take_action(cb_event, zs_report):
             'cb_event': cb_event,
             'zs_report': zs_report
         }
-        r = requests.post(url, headers=headers, json=body)
+        requests.post(url, headers=headers, json=body)
 
     # Run a script
-    if actions['script'] != None:
+    if actions['script'] is not None:
         log.info('[APP.PY] Running Script')
         device_id = str(cb_event['device_id'])
         process_id = str(cb_event['pid'])
@@ -121,15 +123,15 @@ def take_action(cb_event, zs_report):
 
         log.info('[APP.PY] {0} {0}'.format(cmd, args))
 
-        sub_script = subprocess.Popen(cmd + args, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+        subprocess.Popen(cmd + args, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
         log.info('[APP.PY] this comes after the subprocess')
 
     # !!! Isolate endpoint
     if actions['isolate'].lower() in ['true', '1']:
-        cb.isolate_device(event['device_id'])
+        cb.isolate_device(cb_event['device_id'])
 
-    if actions['policy'] != None:
-        cb.update_policy(event['device_id'], actions['policy'])
+    if actions['policy'] is not None:
+        cb.update_policy(cb_event['device_id'], actions['policy'])
 
 
 def process_events(events):
@@ -202,10 +204,13 @@ def main():
         end_time = convert_time(available_span['upper'])
 
         # Build the query based on start/end_time and process reputation from configs
-        query = 'process_start_time:[{0} TO {1}] AND process_reputation:'.format(start_time, end_time)
-        q_filters = config['CarbonBlack']['filters'].split(',')
-        q_filters2 = ' AND process_effective_reputation:'.join(q_filters)
-        query = '{0}{1}'.format(query, q_filters2)
+        query = 'process_start_time:[{0} TO {1}]'.format(start_time, end_time)
+
+        # This is more filtering if the events are too verbose. Ended up not needing this in testing
+        # query = query + ' AND process_reputation:'.format(start_time, end_time)
+        # q_filters = config['CarbonBlack']['filters'].split(',')
+        # q_filters2 = ' AND process_effective_reputation:'.join(q_filters)
+        #query = '{0}{1}'.format(query, q_filters2)
 
         # Submit the query and get a list of processes unique by hash
         events = cb.get_processes(query, db)

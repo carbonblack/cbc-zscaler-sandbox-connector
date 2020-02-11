@@ -7,24 +7,9 @@ import logging as log
 from time import sleep
 
 from lib.helpers import CarbonBlack
-from cbapi.psc.defense import CbDefenseAPI, Device
 
 log.basicConfig(filename='app.log', format='[%(asctime)s] <pid:%(process)d> %(message)s', level=log.DEBUG)
 log.info('Sarted action script')
-
-def connect_callback(cb, line):
-    try:
-        sensor_id = int(line)
-    except ValueError:
-        sensor_id = None
-
-    if not sensor_id:
-        q = cb.select(Device).where("hostNameExact:{0}".format(line))
-        sensor = q.first()
-    else:
-        sensor = cb.select(Device, sensor_id)
-
-    return sensor
 
 
 def init():
@@ -83,6 +68,7 @@ def main():
     if args.close:
         cb.close_session()
         print('[Main] Closed session')
+
 
 if __name__ == "__main__":
     sys.exit(main())
