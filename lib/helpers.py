@@ -117,14 +117,14 @@ class CarbonBlack:
     #
     # CBC Endpoint Standard
     #
-    def get_events(self, timespan='3h', rows=2500, start=0):
+    def get_events(self, timespan='3h', rows=2500, start=0, unique=False):
         '''
             Get all events within the provided timespan.
 
             Inputs:
                 timespan: The searchWindow from which to pull events [optional] (str)
-                    3h for the past three hours
-                    1d for the past one day - default
+                    3h for the past three hours - default
+                    1d for the past one day
                     1w for the past one week
                     2w for the past two weeks
                     1m for the past one month
@@ -136,10 +136,16 @@ class CarbonBlack:
 
         self.log.info('[%s] Getting events for the last {0}'.format(timespan), self.class_name)
 
+        # !!! There is a bug looping through events in CBAPI
         # events = self.cbd.select(Event).where('searchWindow:3h')
-        # return events
+
+        # for event in events:
+        #     raw_event = event.original_document
+        #     print(json.dumps(raw_event, indent=4))
+        #     return
 
         total_results = rows + 1
+        all_events = []
         unique_events = []
         event_tracking = []
 
@@ -167,7 +173,11 @@ class CarbonBlack:
                 event['sha256'] = event['selectedApp']['sha256Hash']
                 event['device_id'] = event['deviceDetails']['deviceId']
                 event['pid'] = event['processDetails']['processId']
+                event['type'] = 'cbd'
 
+                all_events.append(event)
+
+                # Filter unique events
                 if event['md5'] not in event_tracking:
                     event_tracking.append(event['md5'])
                     unique_events.append(event)
@@ -175,8 +185,11 @@ class CarbonBlack:
             params['start'] = params['start'] + rows
             total_results = data['totalResults']
 
-        self.log.info('[%s] Found {0} unique events'.format(len(unique_events)), self.class_name)
-        return unique_events
+        self.log.info('[%s] Found {0} events, {1} unique events'.format(len(all_events), len(unique_events)),
+                      self.class_name)
+        if unique:
+            return unique_events
+        return all_events
 
     def get_event(self, event_id):
         '''
@@ -253,7 +266,7 @@ class CarbonBlack:
 
         return data
 
-    def get_processes(self, query, db, rows=500, start=0):
+    def get_processes(self, query, db, rows=500, start=0, unique=False):
         '''
             Get process search results from CBC Enterprise EDR
 
@@ -264,62 +277,90 @@ class CarbonBlack:
                 start: where to start in the results (int)
 
             Outputs:
-                Returns a list of processes
+                Returns a list of processes (list of dicts)
         '''
 
         self.log.info('[%s] Getting processes: {0}'.format(query), self.class_name)
 
-        # Keep a dictionary of the processes to be returned
-        processes = []
-
-        # For filtering unique processes (hashes)
+        all_procs = []
+        proc_tracker = []
         unique_procs = []
+        hash_tracker = {}
 
-        # Paginate through the processes
-        procs = self.cbth.select(Process).where(query)  # .sort_by('first_event_time', 'DESC') # !!! need to figure out how to sort these
-
+        processes = self.cbth.select(Process).where(query)  # .sort_by('first_event_time', 'DESC') # !!! need to figure out how to sort these
         # query.sort_by('first_event_time', 'DESC')
-        for process in procs:
-            # Filter out things we already checked
-            if process.process_sha256 in unique_procs:
-                continue
-            unique_procs.append(process.process_sha256)
 
+        for process in processes:
             # Get the raw JSON
             raw_proc = process.original_document
+            raw_proc['type'] = 'cbth'
+            raw_proc['pid'] = raw_proc['process_pid'][0]
 
+            # Sometimes we don't have a hash. Skip these
             if 'process_hash' not in raw_proc:
                 self.log.info('[%s] Process is missing MD5 and SHA256. Skipping.', self.class_name)
                 continue
 
+            # Sometimes we only have 1 hash type
             if len(raw_proc['process_hash']) == 1:
+                # If it is an MD5
                 if len(raw_proc['process_hash'][0]) == 32:
-                    self.log.info('[%s] Process is missing the SHA256. Skipping.', self.class_name)
+                    self.log.info('[%s] Process is missing the SHA256', self.class_name)
                     raw_proc['md5'] = raw_proc['process_hash'][0]
-                    continue
 
+                    # If we are tracking the hash, use it's value
+                    if raw_proc['md5'] in hash_tracker.keys():
+                        raw_proc['sha256'] = hash_tracker[raw_proc['md5']]
+
+                    # Otherwise fill with 0's
+                    else:
+                        raw_proc['sha256'] = '0'*64
+
+                # If we only have the sha256
                 else:
                     self.log.info('[%s] Process is missing the MD5', self.class_name)
                     raw_proc['sha256'] = raw_proc['process_hash'][0]
-                    metadata = self.get_metadata(raw_proc['process_hash'][0])
 
-                    if metadata is not None:
-                        raw_proc['md5'] = metadata['md5']
+                    # If we are tracking the sha256, grab the md5
+                    if raw_proc['sha256'] in hash_tracker.values():
+                        md5s = hash_tracker.keys()
+                        sha256s = hash_tracker.values()
+                        raw_proc['md5'] = list(md5s)[list(sha256s).index(raw_proc['sha256'])]
 
+                    # If we aren't tracking the sha256
                     else:
-                        self.log.info('[%s] Unable to get file metadata. Skipping.', self.class_name)
-                        continue
+                        # Get the metadata. Sometimes that has the md5
+                        metadata = self.get_metadata(raw_proc['process_hash'][0])
 
+                        # If it has the md5, save it
+                        if metadata is not None:
+                            raw_proc['md5'] = metadata['md5']
+
+                        # Since Zscaler Sandbox requires an md5, skip if we can't find the md5
+                        else:
+                            self.log.info('[%s] Unable to get file metadata. Skipping.', self.class_name)
+                            continue
+
+            # Usually we have both hashes
             if len(raw_proc['process_hash']) == 2:
                 raw_proc['md5'] = raw_proc['process_hash'][0]
                 raw_proc['sha256'] = raw_proc['process_hash'][1]
-                raw_proc['pid'] = raw_proc['process_pid'][0]
 
-            # Save the JSON
-            processes.append(raw_proc)
+            # Track the hashes to prevent redundant API lookups
+            if raw_proc['md5'] not in hash_tracker.keys():
+                hash_tracker[raw_proc['md5']] = raw_proc['sha256']
 
-        self.log.info('[%s] Found {0} unique processes'.format(len(processes)), self.class_name)
-        return processes
+            # Save the process
+            all_procs.append(raw_proc)
+
+            # Filter out things we already checked
+            if raw_proc['sha256'] not in unique_procs:
+                unique_procs.append(raw_proc)
+
+        self.log.info('[%s] Found {0} unique processes'.format(len(unique_procs)), self.class_name)
+        if unique:
+            return unique_procs
+        return all_procs
 
     def get_metadata(self, sha256):
         '''
@@ -688,6 +729,10 @@ class CarbonBlack:
 
 
 class Database:
+    '''
+        A helper class for working with the database actions requires for this integration.
+    '''
+
     def __init__(self, config, log):
         '''
             Initialise the database object. Create database and tables if they
