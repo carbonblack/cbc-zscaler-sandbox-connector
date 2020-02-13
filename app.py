@@ -108,13 +108,14 @@ def take_action(cb_event, zs_report):
 
         feed = cb.get_feed(feed_name=actions['watchlist'])
         if feed is None:
-            summary = 'MD5 indicators that tested positive in Zscaler Sandbox for one of the following: {0}'.format(config['Zscaler']['bad_types'])
+            summary = 'MD5 indicators that tested positive in Zscaler Sandbox for one of \
+                       the following: {0}'.format(config['Zscaler']['bad_types'])
             feed = cb.create_feed(actions['watchlist'], config['Zscaler']['url'], summary, [report])
         else:
             cb.update_feed(feed, report)
 
     # Send data to webhook
-    if actions['webhook'] is not None:
+    if 'webhook' in actions and actions['webhook'] is not None:
         url = actions['webhook']
         headers = {
             'Content-Type': 'application/json'
@@ -126,13 +127,14 @@ def take_action(cb_event, zs_report):
         requests.post(url, headers=headers, json=body)
 
     # Run a script
-    if actions['script'] is not None:
+    if 'script' in actions and actions['script'] is not None:
         log.info('[APP.PY] Running Script')
         device_id = str(cb_event['device_id'])
         process_id = str(cb_event['pid'])
         script_cwd = os.path.dirname(os.path.realpath(__file__))
         stdin = stdout = subprocess.PIPE
 
+        # Replace elements
         script = config['actions']['script']
         script = script.replace('{device_id}', device_id)
         script = script.replace('{command}', 'kill')
@@ -144,14 +146,16 @@ def take_action(cb_event, zs_report):
 
         log.info('[APP.PY] {0} {0}'.format(cmd, args))
 
-        subprocess.Popen(cmd + args, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
-        log.info('[APP.PY] this comes after the subprocess')
 
-    # !!! Isolate endpoint
-    if actions['isolate'].lower() in ['true', '1']:
+        # !!! do i need stdout and stdin?
+        subprocess.Popen(cmd + args, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+
+    # Isolate endpoint
+    if 'isolate' in actions and actions['isolate'].lower() in ['true', '1']:
         cb.isolate_device(cb_event['device_id'])
 
-    if actions['policy'] is not None:
+    # Change device's policy
+    if 'policy' in actions and actions['policy'] is not None:
         cb.update_policy(cb_event['device_id'], actions['policy'])
 
 

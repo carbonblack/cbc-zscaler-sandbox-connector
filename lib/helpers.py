@@ -18,7 +18,7 @@ from cbapi.psc.models import BaseAlert
 
 # Import Defense
 from cbapi.psc.defense import CbDefenseAPI
-from cbapi.psc.defense.models import Event, Device
+from cbapi.psc.defense.models import Event, Device, Policy
 
 # Import ThreatHunter
 from cbapi.psc.threathunter import CbThreatHunterAPI
@@ -95,17 +95,24 @@ class CarbonBlack:
         return alerts
 
     def get_device(self, device_id):
-        return self.cbd.select(Device).where('device_id:{0}'.format(device_id)).first()
+        return self.cbd.select(Device, device_id)
 
     def isolate_device(self, device_id):
-        devices = self.get_device(device_id)
-        # !!! How to isolate endpoint?
+        device = self.get_device(device_id)
+        device.quarantine(True)
+
+        return device
 
     def update_policy(self, device_id, policy_name):
-        devices = self.get_device(device_id)
-        for dev in devices:
-            dev.policyName = policy_name
-            dev.save()
+        device = self.get_device(device_id)
+        policies = self.cbd.select(Policy)
+        for policy in policies:
+            if policy.name == policy_name:
+                device.update_policy(policy.id)
+                return device
+
+        return None
+
 
     #
     # CBC Endpoint Standard
@@ -352,7 +359,7 @@ class CarbonBlack:
             Inputs: None
 
             Output:
-                Raw JSON of all feeds
+                An object of the feeds
         '''
 
         self.log.info('[%s] Getting all feeds', self.class_name)
@@ -372,7 +379,7 @@ class CarbonBlack:
                 feed_name: Name of the feed to pull (str)
 
             Output:
-                Raw JSON of the feed if one was found, otherwise None
+                An object of the feed if one was found, otherwise None
         '''
 
         self.log.info('[%s] Getting feed: {0}'.format(feed_id), self.class_name)
@@ -384,12 +391,6 @@ class CarbonBlack:
         if feed_id is not None and feed_name is not None:
             self.log.info('[%s] Both feed_id and feed_name provided. Please only provide one', self.class_name)
             return None
-
-        # if not isinstance(feed_id, int) or None:
-        #     return None
-
-        # if not isinstance(feed_name, str) or None:
-        #     return None
 
         # If the feed_name was provided, get all the feeds and check their names
         if feed_name is not None:
@@ -451,10 +452,10 @@ class CarbonBlack:
                 timestamp: Epoch timestamp to be added to the report (int)
                 title: Title of the report (str)
                 description: Description of the report (str)
-                severity: Severity of the report (int)
+                severity: Severity of the report [1-10] (int)
                 link: Link to report (str)
                 tags: List of tags (list of str)
-                md5: Hash IOC to be added to the report
+                md5: Hash IOC to be added to the report (str)
 
             Output:
                 An object of the newly created report
@@ -481,12 +482,24 @@ class CarbonBlack:
         return report
 
     def update_feed(self, feed, report):
+        '''
+            Updates a feed with a new report.
+
+            Inputs
+                feed: A feed (obj)
+                report: a report (dict)
+
+            Output
+                Returns the updated feed
+
+            > Note that this actually pulls all of the reports from the the feed, appends the new report, then
+                resubmits everything.
+        '''
+        self.log.info('[%s] Updating feed: {0}'.format(feed_id), self.class_name)
         report = Report(self.cbth, initial_data=report, feed_id=feed.id)
         feed.append_reports([report])
 
-        return report
-
-        # self.log.info('[%s] Updating feed: {0}'.format(feed_id), self.class_name)
+        return feed
 
     #
     # CBC Live Response helpers
