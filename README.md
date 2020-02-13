@@ -1,4 +1,4 @@
-# Zscaler ZIA Sandbox connector for VMware Carbon Black Cloud
+# Zscaler ZIA Sandbox Connector for VMware Carbon Black Cloud
 
 ## Overview
 
@@ -29,7 +29,7 @@ Install the requirements
 
 Edit the `config.conf` file and update with your configurations
 
-### Configuration
+## Configuration
 
 All of the configurable settings for the integration can be found in `config.conf`.
 
@@ -58,7 +58,7 @@ Here is a [link](https://github.com/carbonblack/cbc-zscaler-sandbox-connector/bl
 | `filename`       | Filename of the sqlite3 database   |
 | **actions**      | **Configure Actions**              |
 | `watchlist`      | Name of watchlist to populate      |
-| `webhook`        | URL to POST a JSON object of the even/process and sandbox report |
+| `webhook`        | URL to `POST` a JSON object of the event and sandbox report |
 | `script`         | A script to execute                |
 | `isolate`        | Isolate the endpoint?              |
 | `policy`         | Policy to move offending devices   |

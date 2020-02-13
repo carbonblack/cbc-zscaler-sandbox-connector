@@ -4,6 +4,7 @@ import json
 import sqlite3
 from sqlite3 import Error
 
+import uuid
 import time
 from time import sleep
 from datetime import datetime, timedelta
@@ -293,7 +294,7 @@ class CarbonBlack:
                 else:
                     self.log.info('[%s] Process is missing the MD5', self.class_name)
                     raw_proc['sha256'] = raw_proc['process_hash'][0]
-                    metadata = self.ubs_get_metadata(raw_proc['process_hash'][0])
+                    metadata = self.get_metadata(raw_proc['process_hash'][0])
 
                     if metadata is not None:
                         raw_proc['md5'] = metadata['md5']
@@ -313,7 +314,7 @@ class CarbonBlack:
         self.log.info('[%s] Found {0} unique processes'.format(len(processes)), self.class_name)
         return processes
 
-    def ubs_get_metadata(self, sha256):
+    def get_metadata(self, sha256):
         '''
             Pulls the metadata for a file. Sometimes the MD5 of a process
                 isn't included in the process request. This will get the metadata
@@ -409,7 +410,7 @@ class CarbonBlack:
         self.log.info('[%s] Pulled feed {0} with name {1}'.format(feed_id, feed.name), self.class_name)
         return feed
 
-    def create_feed(self, name, url, summary, report):
+    def create_feed(self, name, url, summary, reports):
         '''
             Creates a new feed in CBC Enterprise EDR
 
@@ -433,8 +434,8 @@ class CarbonBlack:
         }
 
         feed = {
-            "feedinfo": feed_info,
-            "reports": [report]
+            'feedinfo': feed_info,
+            'reports': reports
         }
 
         feed = self.cbth.create(Feed, feed)
@@ -452,7 +453,7 @@ class CarbonBlack:
                 description: Description of the report (str)
                 severity: Severity of the report (int)
                 link: Link to report (str)
-                tags: List of tags (list)
+                tags: List of tags (list of str)
                 md5: Hash IOC to be added to the report
 
             Output:
@@ -462,24 +463,30 @@ class CarbonBlack:
         self.log.info('[%s] Creating new feed:', self.class_name)
 
         report = {
+            'id': str(uuid.uuid4()),
             'timestamp': timestamp,
             'title': title,
             'description': description,
             'severity': severity,
             'link': link,
             'tags': tags,
-            'iocs': [{
+            'iocs': {
                 'md5': [md5]
-            }]
+            }
         }
 
-        report = self.cbth.create(Report, report)
+        # report = self.cbth.create(Report, report)
 
         self.log.info(report)
         return report
 
-    def update_feed(self, feed_id, report):
-        self.log.info('[%s] Updating feed: {0}'.format(feed_id), self.class_name)
+    def update_feed(self, feed, report):
+        report = Report(self.cbth, initial_data=report, feed_id=feed.id)
+        feed.append_reports([report])
+
+        return report
+
+        # self.log.info('[%s] Updating feed: {0}'.format(feed_id), self.class_name)
 
     #
     # CBC Live Response helpers
@@ -995,11 +1002,11 @@ class Zscaler:
             Output:
                 Raw JSON response of the request
 
-            > Note: there is a blocking 1 second delay to throttle requests to
+            > Note: there is a blocking 0.5 second delay to throttle requests to
                 Zscaler's sandbox (max 2/second)
         '''
 
-        self.log.info('[%s] Checking file: {}'.format(md5), self.class_name)
+        self.log.info('[%s] Checking file: {0}'.format(md5), self.class_name)
 
         if self.quota is None:
             self.get_quota()
@@ -1034,6 +1041,7 @@ class Zscaler:
             if zs_report is not None:
                 zs_type = zs_report['Summary']['Classification']['Type']
                 self.log.info('[%s] Sandbox report Classification Type: {0}'.format(zs_type), self.class_name)
+                return zs_report['Summary']
             else:
                 self.log.info('[%s] Unknown file: {0}'.format(md5), self.class_name)
             return zs_report

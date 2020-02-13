@@ -70,25 +70,46 @@ def take_action(cb_event, zs_report):
             actions[action] = config['actions'][action]
 
     # Create/update watchlist feed
-    if actions['watchlist'] is not None:
-        report = cb.create_report(
-            zs_report['timestamp'],
-            zs_report['title'],
-            zs_report['description'],
-            zs_report['severity'],
-            zs_report['link'],
-            zs_report['tags'],
-            zs_report['md5']
-        )
+    if 'watchlist' in actions and actions['watchlist'] is not None:
+        # Shorten vaiables
+        Status = zs_report['Status']
+        Category = zs_report['Category']
+        FileType = zs_report['FileType']
+        StartTime = zs_report['StartTime']
+        Duration = zs_report['Duration']
+        Type = zs_report['Type']
+        Category = zs_report['Category']
+        Score = zs_report['Score']
+        DetectedMalware = zs_report['DetectedMalware']
+
+        # Build the Report arguments
+        timestamp = convert_time(convert_time('now'))
+        title = '{} - {}'.format(Type, Category)
+        description = '''Report Summary\n
+            Status: {}\n
+            Category: {}\n
+            FileType: {}\n
+            StartTime: {}\n
+            Duration: {}\n
+
+            Type: {}\n
+            Category: {}\n
+            Score: {}\n
+            DetectedMalware: {}\n'''.format(Status, Category, FileType,
+                                            StartTime, Duration, Type,
+                                            Category, Score, DetectedMalware)
+        url = '{}/{}'.format(conig['Zscaler']['url'], '#insights/web')
+        tags = [Type, Category, FileType]
+        md5 = event['md5']
+
+        # Build the Report
+        report = cb.create_report(timestamp, title, description, Score, url, tags, md5)
+        log.debug(report)
 
         feed = cb.get_feed(feed_name=actions['watchlist'])
         if feed is None:
-            feed = cb.create_feed(
-                actions['watchlist'],
-                config['Zscaler']['url'],
-                'Found Reports from Zscaler ZIA Sandbox',
-                report
-            )
+            summary = 'MD5 indicators that tested positive in Zscaler Sandbox for one of the following: {0}'.format(config['Zscaler']['bad_types'])
+            feed = cb.create_feed(actions['watchlist'], config['Zscaler']['url'], summary, [report])
         else:
             cb.update_feed(feed, report)
 
@@ -135,14 +156,28 @@ def take_action(cb_event, zs_report):
 
 
 def process_events(events):
+    '''
+        Loops through CBTH processes or CBD events. If a hash is found in the database or from Zscaler
+        then it passes the event and ZS Sandbox report to the take_action() method.
+
+        Inputs
+            events: A list of process or event objects
+
+        Output: None
+    '''
     for event in events:
 
         # for testing CBD hash issues
-        if 'eventId' in event:
-            log.debug('[!!!] Event: {0}'.format(json.dumps(event, indent=4)))
-            log.debug('[!!!] EventID: {0}'.format(event['eventId']))
-            log.debug('[!!!] MD5: {0}'.format(event['md5']))
-            log.debug('[!!!] SHA256: {0}'.format(event['sha256']))
+        # if 'eventId' in event:
+        #     log.debug('[!!!] Event: {0}'.format(json.dumps(event, indent=4)))
+        #     log.debug('[!!!] EventID: {0}'.format(event['eventId']))
+        #     log.debug('[!!!] MD5: {0}'.format(event['md5']))
+        #     log.debug('[!!!] SHA256: {0}'.format(event['sha256']))
+
+        # Sometimes CBD is missing the MD5. Not much we can do about it, so skip these.
+        if event['md5'] is None:
+            log.debug('[!!!] Missing MD5: {0}'.format(json.dumps(event, indent=4)))
+            continue
 
         # Check to see if we know about this file in the database
         db_record = db.get_file(md5=event['md5'])
@@ -154,7 +189,7 @@ def process_events(events):
 
             # If Zscaler does know about it
             if zs_report not in [None, False]:
-                zs_type = zs_report['Summary']['Classification']['Type']
+                zs_type = zs_report['Classification']['Type']
                 # Add the file to the database
                 db.add_file(md5=event['md5'], sha256=event['sha256'], status=zs_type)
 
@@ -190,6 +225,11 @@ def process_events(events):
 def main():
     # Get inits
     init()
+
+    # cb_event =
+    # take_action(cb_event, zs_report)
+
+    # return
 
     cbth_enabled = str2bool(config['CarbonBlack']['cbth_enabled'])
     cbd_enabled = str2bool(config['CarbonBlack']['cbd_enabled'])
