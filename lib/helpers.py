@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 
 import sqlite3
@@ -95,7 +96,7 @@ class CarbonBlack:
         return alerts
 
     def get_device(self, device_id):
-        return self.cbd.select(Device, device_id)
+        return self.cb.select(Device, device_id)
 
     def isolate_device(self, device_id):
         device = self.get_device(device_id)
@@ -108,6 +109,7 @@ class CarbonBlack:
         policies = self.cbd.select(Policy)
         for policy in policies:
             if policy.name == policy_name:
+                self.log.debug('[%s] Found policy {0} with id {1}'.format(policy_name, policy.id))
                 device.update_policy(policy.id)
                 return device
 
@@ -266,7 +268,7 @@ class CarbonBlack:
 
         return data
 
-    def get_processes(self, query, db, rows=500, start=0, unique=False):
+    def get_processes(self, query, db, unique=False):
         '''
             Get process search results from CBC Enterprise EDR
 
@@ -280,21 +282,21 @@ class CarbonBlack:
                 Returns a list of processes (list of dicts)
         '''
 
-        self.log.info('[%s] Getting processes: {0}'.format(query), self.class_name)
+        self.log.info('[%s] Getting processes: "{0}"'.format(query), self.class_name)
 
         all_procs = []
         proc_tracker = []
         unique_procs = []
         hash_tracker = {}
 
-        processes = self.cbth.select(Process).where(query)  # .sort_by('first_event_time', 'DESC') # !!! need to figure out how to sort these
-        # query.sort_by('first_event_time', 'DESC')
+        processes = self.cbth.select(Process).where(query).sort_by('device_timestamp', 'DESC')
 
         for process in processes:
             # Get the raw JSON
             raw_proc = process.original_document
             raw_proc['type'] = 'cbth'
             raw_proc['pid'] = raw_proc['process_pid'][0]
+            # print(json.dumps(raw_proc))
 
             # Sometimes we don't have a hash. Skip these
             if 'process_hash' not in raw_proc:
@@ -536,7 +538,7 @@ class CarbonBlack:
             > Note that this actually pulls all of the reports from the the feed, appends the new report, then
                 resubmits everything.
         '''
-        self.log.info('[%s] Updating feed: {0}'.format(feed_id), self.class_name)
+        self.log.info('[%s] Updating feed: {0}'.format(feed.id), self.class_name)
         report = Report(self.cbth, initial_data=report, feed_id=feed.id)
         feed.append_reports([report])
 
@@ -1054,14 +1056,16 @@ class Zscaler:
         '''
             Gets a report from Zscaler's sandbox
 
-            Inputs:
-                md5: MD5 hash to search for
+            Inputs
+                md5: MD5 hash to search for (str)
 
-            Output:
-                Raw JSON response of the request
+            Outputs (3 options)
+                None  - if Zscaler didn't return a report (hash not found)
+                False - if the Sandbox quota has been exceeded
+                report - the raw JSON from Zscaler if a report was found
 
             > Note: there is a blocking 0.5 second delay to throttle requests to
-                Zscaler's sandbox (max 2/second)
+                Zscaler's sandbox (max 2 persecond)
         '''
 
         self.log.info('[%s] Checking file: {0}'.format(md5), self.class_name)
@@ -1143,7 +1147,7 @@ def convert_time(timestamp):
         Converts epoch or ISO8601 formatted timestamp
 
         Inputs:
-            timestamp:
+            timestamp
                 epoch time (int)
                 ISO8601 time (str)
                 'now' (str)
@@ -1152,6 +1156,8 @@ def convert_time(timestamp):
             If timestamp was epoch, returns ISO8601 version of timestamp
             If timestamp was ISO8601, returns epoch version of timestamp
             If timestamp was 'now', returns ISO8601 of current time
+
+        > Note: All times are treated as GMT
     '''
 
     if isinstance(timestamp, int):

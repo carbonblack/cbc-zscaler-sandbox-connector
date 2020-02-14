@@ -32,18 +32,26 @@ def init():
 
     global config, db, cb, zs
 
-    # Configure logging
-    log.basicConfig(filename='app.log', format='[%(asctime)s] <pid:%(process)d> %(message)s', level=log.DEBUG)
-    log.info('[APP.PY] Sarted Zscaler ZIA Sandbox Connector for VMware Carbon Black Cloud')
-
     # Get setting from config.ini
     config = configparser.ConfigParser()
     config.read('config.conf')
 
+    # Configure logging
+    log.basicConfig(filename=config['logging']['filename'], format='[%(asctime)s] <pid:%(process)d> %(message)s', level=log.DEBUG)
+    log.info('[APP.PY] Sarted Zscaler ZIA Sandbox Connector for VMware Carbon Black Cloud')
+
     # Configure CLI input arguments
     parser = argparse.ArgumentParser(description='Get events / processes from VMware Carbon Black Cloud')
     parser.add_argument('--last_pull', help='Set the last pull time in ISO8601 format')
+    parser.add_argument('--cbd', action='store_true', default=False, help='Pull CBD events')
+    parser.add_argument('--cbth', action='store_true', default=False, help='Pull CBTH processes')
     args = parser.parse_args()
+
+
+    log.debug(args.cbd)
+    if args.cbd or args.cbth:
+        config['CarbonBlack']['cbd_enabled'] = str(args.cbd)
+        config['CarbonBlack']['cbth_enabled'] = str(args.cbth)
 
     # Init database
     db = Database(config, log)
@@ -69,18 +77,20 @@ def take_action(cb_event, zs_report):
         else:
             actions[action] = config['actions'][action]
 
+    log.debug(json.dumps(zs_report, indent=4))
+
     # Create/update watchlist feed
     if 'watchlist' in actions and actions['watchlist'] is not None:
         # Shorten vaiables
-        Status = zs_report['Status']
-        Category = zs_report['Category']
-        FileType = zs_report['FileType']
-        StartTime = zs_report['StartTime']
-        Duration = zs_report['Duration']
-        Type = zs_report['Type']
-        Category = zs_report['Category']
-        Score = zs_report['Score']
-        DetectedMalware = zs_report['DetectedMalware']
+        Status = zs_report['Summary']['Status']
+        Category = zs_report['Summary']['Category']
+        FileType = zs_report['Summary']['FileType']
+        StartTime = zs_report['Summary']['StartTime']
+        Duration = zs_report['Summary']['Duration']
+        Type = zs_report['Classification']['Type']
+        Category = zs_report['Classification']['Category']
+        Score = zs_report['Classification']['Score']
+        DetectedMalware = zs_report['Classification']['DetectedMalware']
 
         # Build the Report arguments
         timestamp = convert_time(convert_time('now'))
@@ -98,12 +108,14 @@ def take_action(cb_event, zs_report):
             DetectedMalware: {}\n'''.format(Status, Category, FileType,
                                             StartTime, Duration, Type,
                                             Category, Score, DetectedMalware)
-        url = '{}/{}'.format(conig['Zscaler']['url'], '#insights/web')
+
+        severity = str(int(int(Score) / 10))
+        url = '{}/{}'.format(config['Zscaler']['url'], '#insights/web')
         tags = [Type, Category, FileType]
-        md5 = event['md5']
+        md5 = cb_event['md5']
 
         # Build the Report
-        report = cb.create_report(timestamp, title, description, Score, url, tags, md5)
+        report = cb.create_report(timestamp, title, description, severity, url, tags, md5)
         log.debug(report)
 
         feed = cb.get_feed(feed_name=actions['watchlist'])
@@ -126,37 +138,40 @@ def take_action(cb_event, zs_report):
         }
         requests.post(url, headers=headers, json=body)
 
-    # Run a script
-    if 'script' in actions and actions['script'] is not None:
-        log.info('[APP.PY] Running Script')
-        device_id = str(cb_event['device_id'])
-        process_id = str(cb_event['pid'])
-        script_cwd = os.path.dirname(os.path.realpath(__file__))
-        stdin = stdout = subprocess.PIPE
+    # !!! Used for debugging. Limit only to my devices
+    if device_id == 3238121:
 
-        # Replace elements
-        script = config['actions']['script']
-        script = script.replace('{device_id}', device_id)
-        script = script.replace('{command}', 'kill')
-        script = script.replace('{argument}', process_id)
-        script = script.split(' ')
+        # Run a script
+        if 'script' in actions and actions['script'] is not None:
+            log.info('[APP.PY] Running Script')
+            device_id = str(cb_event['device_id'])
+            process_id = str(cb_event['pid'])
+            script_cwd = os.path.dirname(os.path.realpath(__file__))
+            stdin = stdout = subprocess.PIPE
 
-        cmd = [os.path.join(script_cwd, script[0])]
-        args = script[1:]
+            # Replace elements
+            script = config['actions']['script']
+            script = script.replace('{device_id}', device_id)
+            script = script.replace('{command}', 'kill')
+            script = script.replace('{argument}', process_id)
+            script = script.split(' ')
 
-        log.info('[APP.PY] {0} {0}'.format(cmd, args))
+            cmd = [os.path.join(script_cwd, script[0])]
+            args = script[1:]
+
+            log.info('[APP.PY] {0} {0}'.format(cmd, args))
 
 
-        # !!! do i need stdout and stdin?
-        subprocess.Popen(cmd + args, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+            # !!! do i need stdout and stdin?
+            subprocess.Popen(cmd + args, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
 
-    # Isolate endpoint
-    if 'isolate' in actions and actions['isolate'].lower() in ['true', '1']:
-        cb.isolate_device(cb_event['device_id'])
+        # Isolate endpoint
+        if 'isolate' in actions and actions['isolate'].lower() in ['true', '1']:
+            cb.isolate_device(cb_event['device_id'])
 
-    # Change device's policy
-    if 'policy' in actions and actions['policy'] is not None:
-        cb.update_policy(cb_event['device_id'], actions['policy'])
+        # Change device's policy
+        if 'policy' in actions and actions['policy'] is not None:
+            cb.update_policy(cb_event['device_id'], actions['policy'])
 
 
 def process_events(events):
@@ -169,6 +184,9 @@ def process_events(events):
 
         Output: None
     '''
+
+    report_cache = {}
+
     for event in events:
 
         # for testing CBD hash issues
@@ -189,7 +207,12 @@ def process_events(events):
         # If we don't know about it
         if db_record is None:
             # Check to see if Zscaler knows about the file
-            zs_report = zs.get_report(event['md5'])
+
+            if event['md5'] in report_cache:
+                zs_report = report_cache[event['md5']]
+            else:
+                zs_report = zs.get_report(event['md5'])
+                report_cache[event['md5']] = zs_report
 
             # If Zscaler does know about it
             if zs_report not in [None, False]:
@@ -215,14 +238,13 @@ def process_events(events):
             days = hours / 24
 
             # If the last report is more than 30 days old, check again
-            if days >= 30:
-                zs_report = zs.get_report(event['md5'])
-                db.update_file(event['md5'])
+            # if days >= 30:
+            #     zs_report = zs.get_report(event['md5'])
+            #     db.update_file(event['md5'])
 
             if status in zs.bad_types:
-                # Only take 1 action every 3 hours
-                if hours > 3:
-                    take_action(event, zs_report)
+                zs_report = zs.get_report(event['md5'])
+                take_action(event, zs_report)
     return
 
 
@@ -230,31 +252,28 @@ def main():
     # Get inits
     init()
 
-    # cb_event =
-    # take_action(cb_event, zs_report)
-
-    # return
-
     cbth_enabled = str2bool(config['CarbonBlack']['cbth_enabled'])
     cbd_enabled = str2bool(config['CarbonBlack']['cbd_enabled'])
 
     if cbth_enabled:
         # Get the start and end times
         # Start time comes from the datbase's last_pull time
-        start_time = db.last_pull()
+        last_pull = convert_time(db.last_pull())
+        buffer_time = 30 * 60 # 30 minutes
+        start_time = convert_time(last_pull - buffer_time)
 
         # End time is the 'upper' of available span
         available_span = cb.get_available_span()
         end_time = convert_time(available_span['upper'])
 
         # Build the query based on start/end_time and process reputation from configs
-        query = 'process_start_time:[{0} TO {1}]'.format(start_time, end_time)
+        query = '(process_start_time:[{0} TO {1}])'.format(start_time, end_time)
 
-        # This is more filtering if the events are too verbose. Ended up not needing this in testing
-        # query = query + ' AND process_reputation:'.format(start_time, end_time)
-        # q_filters = config['CarbonBlack']['filters'].split(',')
-        # q_filters2 = ' AND process_effective_reputation:'.join(q_filters)
-        #query = '{0}{1}'.format(query, q_filters2)
+        if 'reputation_filter' in config['CarbonBlack']:
+            if config['CarbonBlack']['reputation_filter'] != '':
+                filters = config['CarbonBlack']['reputation_filter'].split(',')
+                filters = ' OR process_reputation:'.join(filters)
+                query = '{0} AND (process_reputation:{1})'.format(query, filters)
 
         # Submit the query and get a list of processes unique by hash
         events = cb.get_processes(query, db)
