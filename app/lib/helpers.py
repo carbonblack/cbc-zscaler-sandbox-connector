@@ -68,6 +68,9 @@ class CarbonBlack:
         self.device_id = None
         self.session_id = None
         self.supported_commands = None
+        self.feed = None
+        self.iocs = None
+        self.new_reports = []
 
     #
     # CBC Platform
@@ -92,7 +95,6 @@ class CarbonBlack:
         alerts = list(query)
 
         self.log.info('[%s] Found {0} alerts'.format(len(alerts)), self.class_name)
-
         return alerts
 
     def get_device(self, device_id):
@@ -421,19 +423,22 @@ class CarbonBlack:
                 feed_id: ID of the feed to pull (int)
                 feed_name: Name of the feed to pull (str)
 
-            Output:
-                An object of the feed if one was found, otherwise None
+            Outputs
+                Object  - an object of found feed
+                None    - no feed was found
+                False   - both feed_id and feed_name provided
+                False   - neither feed_id nor feed_name provided
         '''
 
         self.log.info('[%s] Getting feed: {0}'.format(feed_id), self.class_name)
 
         if feed_id is None and feed_name is None:
             self.log.info('[%s] Missing feed_id and feed_name. Need at least one', self.class_name)
-            return None
+            return False
 
         if feed_id is not None and feed_name is not None:
             self.log.info('[%s] Both feed_id and feed_name provided. Please only provide one', self.class_name)
-            return None
+            return False
 
         # If the feed_name was provided, get all the feeds and check their names
         if feed_name is not None:
@@ -443,18 +448,17 @@ class CarbonBlack:
                     feed_id = feed.id
                     break
 
-        self.log.info('feed_id: {0}'.format(feed_id))
-
         # If no feeds were found, return None
         if feed_id is None:
+            self.log.info('[%s] No feed found')
             return None
 
         feed = self.cbth.select(Feed, feed_id)
+        self.log.info('[%s] {0}'.format(feed), self.class_name)
 
-        self.log.info('[%s] Pulled feed {0} with name {1}'.format(feed_id, feed.name), self.class_name)
         return feed
 
-    def create_feed(self, name, url, summary, reports):
+    def create_feed(self, name, url, summary):
         '''
             Creates a new feed in CBC Enterprise EDR
 
@@ -462,7 +466,6 @@ class CarbonBlack:
                 name: Name of the feed to create (str)
                 url: URL of the feed (str)
                 summary: Summary of the feed (str)
-                report: The initial report to add to the feed (obj)
 
             Output:
                 An object of the newly created feed
@@ -479,7 +482,7 @@ class CarbonBlack:
 
         feed = {
             'feedinfo': feed_info,
-            'reports': reports
+            'reports': []
         }
 
         feed = self.cbth.create(Feed, feed)
@@ -504,7 +507,7 @@ class CarbonBlack:
                 An object of the newly created report
         '''
 
-        self.log.info('[%s] Creating new feed:', self.class_name)
+        self.log.info('[%s] Creating new Report:', self.class_name)
 
         report = {
             'id': str(uuid.uuid4()),
@@ -519,8 +522,9 @@ class CarbonBlack:
             }
         }
 
-        # report = self.cbth.create(Report, report)
+        report = self.cbth.create(Report, report)
 
+        self.log.info('[%s] Created report', self.class_name)
         self.log.info(report)
         return report
 
@@ -969,10 +973,10 @@ class Zscaler:
         '''
             Initialize the Zscaler class
 
-            Inputs:
+            Inputs
                 config: Dict containing settings from config.ini
 
-            Output:
+            Output
                 self
         '''
         self.class_name = 'Zscaler'
@@ -985,6 +989,7 @@ class Zscaler:
         self.password = config['Zscaler']['password']
         self.session = None
         self.quota = None
+        self.reports = {}
         self.bad_types = config['Zscaler']['bad_types'].split(',')
         self.headers = {
             'Content-Type': 'application/json',
@@ -1070,6 +1075,10 @@ class Zscaler:
 
         self.log.info('[%s] Checking file: {0}'.format(md5), self.class_name)
 
+        # Check to see if we already have this report
+        if md5 in self.reports:
+            return self.reports[md5]
+
         if self.quota is None:
             self.get_quota()
 
@@ -1097,20 +1106,28 @@ class Zscaler:
                               self.class_name)
 
             # If the response's Summary is a string, it's not a report
-            zs_report = None if isinstance(r.json()['Summary'], str) else r.json()
+            zs_report = None if isinstance(r.json()['Summary'], str) else r.json()['Summary']
 
             # If there was a report, return it
             if zs_report is not None:
-                zs_type = zs_report['Summary']['Classification']['Type']
+                print(zs_report)
+                zs_type = zs_report['Classification']['Type']
                 self.log.info('[%s] Sandbox report Classification Type: {0}'.format(zs_type), self.class_name)
-                return zs_report['Summary']
+
+                self.reports[md5] = zs_report
+                return zs_report
+
             else:
                 self.log.info('[%s] Unknown file: {0}'.format(md5), self.class_name)
+
+            self.reports[md5] = zs_report
             return zs_report
 
         else:
             self.log.info('[%s] Error: Status Code: {0}'.format(r.status_code), self.class_name)
             self.log.info(r.text)
+
+        self.reports[md5] = None
         return None
 
     def get_quota(self):

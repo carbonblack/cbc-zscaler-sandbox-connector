@@ -81,6 +81,8 @@ def take_action(cb_event, zs_report):
 
     # Create/update watchlist feed
     if 'watchlist' in actions and actions['watchlist'] is not None:
+        md5 = cb_event['md5']
+        print(zs_report)
         # Shorten vaiables
         Status = zs_report['Summary']['Status']
         Category = zs_report['Summary']['Category']
@@ -94,37 +96,23 @@ def take_action(cb_event, zs_report):
 
         # Build the Report arguments
         timestamp = convert_time(convert_time('now'))
-        title = '{} - {}'.format(Type, Category)
-        description = '''Report Summary\n
-            Status: {}\n
-            Category: {}\n
-            FileType: {}\n
-            StartTime: {}\n
-            Duration: {}\n
-
-            Type: {}\n
-            Category: {}\n
-            Score: {}\n
-            DetectedMalware: {}\n'''.format(Status, Category, FileType,
-                                            StartTime, Duration, Type,
-                                            Category, Score, DetectedMalware)
+        title = '{} - {} - {}'.format(md5, Type, Category)
+        description = '''Status: {} # Category: {} # FileType: {} # StartTime: {} # Duration: {} # Type: {}
+                         #  Category: {} # Score: {} # DetectedMalware: {}'''.format(Status, Category, FileType,
+                                                                                     StartTime, Duration, Type,
+                                                                                     Category, Score, DetectedMalware)
 
         severity = str(int(int(Score) / 10))
         url = '{}/{}'.format(config['Zscaler']['url'], '#insights/web')
         tags = [Type, Category, FileType]
-        md5 = cb_event['md5']
 
-        # Build the Report
-        report = cb.create_report(timestamp, title, description, severity, url, tags, md5)
-        log.debug(report)
+        if md5 not in cb.iocs:
+            # Build the Report
+            report = cb.create_report(timestamp, title, description, severity, url, tags, md5)
+            cb.new_reports.append(report)
+            cb.iocs.append(md5)
 
-        feed = cb.get_feed(feed_name=actions['watchlist'])
-        if feed is None:
-            summary = 'MD5 indicators that tested positive in Zscaler Sandbox for one of \
-                       the following: {0}'.format(config['Zscaler']['bad_types'])
-            feed = cb.create_feed(actions['watchlist'], config['Zscaler']['url'], summary, [report])
-        else:
-            cb.update_feed(feed, report)
+
 
     # Send data to webhook
     if 'webhook' in actions and actions['webhook'] is not None:
@@ -139,7 +127,7 @@ def take_action(cb_event, zs_report):
         requests.post(url, headers=headers, json=body)
 
     # !!! Used for debugging. Limit only to my devices
-    if device_id == 3238121:
+    if str(cb_event['device_id']) == "3238121":
 
         # Run a script
         if 'script' in actions and actions['script'] is not None:
@@ -237,10 +225,11 @@ def process_events(events):
             hours = difference.seconds / 60 / 60
             days = hours / 24
 
-            # If the last report is more than 30 days old, check again
-            # if days >= 30:
-            #     zs_report = zs.get_report(event['md5'])
-            #     db.update_file(event['md5'])
+            # If the last report is more than 90 days old, check again
+            if days >= 90:
+                zs_report = zs.get_report(event['md5'])
+                zs_type = zs_report['Classification']['Type']
+                db.update_file(event['md5'], event['sha256'], zs_type)
 
             if status in zs.bad_types:
                 zs_report = zs.get_report(event['md5'])
@@ -251,6 +240,11 @@ def process_events(events):
 def main():
     # Get inits
     init()
+
+    feed = cb.get_feed(feed_name=config['actions']['watchlist'])
+    for report in feed.reports:
+        for ioc in report.iocs_v2:
+            print(ioc['values'])
 
     cbth_enabled = str2bool(config['CarbonBlack']['cbth_enabled'])
     cbd_enabled = str2bool(config['CarbonBlack']['cbd_enabled'])
@@ -291,6 +285,17 @@ def main():
         # Process events
         process_events(events)
 
+
+    # If watchlists were enabled in take_action() and there were bad files, update the watchlist
+    if len(cb.new_reports):
+        feed = cb.get_feed(feed_name=config['actions']['watchlist'])
+
+        if feed == None:
+            summary = 'MD5 indicators that tested positive in Zscaler Sandbox for one of \
+                       the following: {0}'.format(config['Zscaler']['bad_types'])
+            feed = cb.create_feed(config['actions']['watchlist'], config['Zscaler']['url'], summary)
+
+        feed.append_reports(cb.new_reports)
     db.close()
 
 
