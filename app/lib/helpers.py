@@ -133,6 +133,9 @@ class CarbonBlack:
                     2w for the past two weeks
                     1m for the past one month
                     all for all
+                rows: number of results [optional] (int)
+                start: row at which to start [optional] (int)
+                unique: return only unique hashes? [optional] (bool)
 
             Output:
                 A list of event objects

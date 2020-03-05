@@ -10,6 +10,7 @@ __pycache__/
 .python-version
 
 # Integration specific
+*/config.conf
 app/*.sql
 app/app.log
 todo.txt
