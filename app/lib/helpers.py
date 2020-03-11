@@ -175,6 +175,12 @@ class CarbonBlack:
 
             data = r.json()
             for event in data['results']:
+                reputation_filter = self.config['CarbonBlack']['reputation_filter'].split(',')
+                effective_reputation = event['selectedApp']['effectiveReputation']
+                # Skip events that are not in the reputation_filter
+                if reputation_filter is not None and effective_reputation not in reputation_filter:
+                    pass
+
                 # Update root with things that might be required later
                 event['md5'] = event['selectedApp']['md5Hash']
                 event['sha256'] = event['selectedApp']['sha256Hash']
@@ -280,8 +286,7 @@ class CarbonBlack:
             Inputs:
                 query: the query to be submitted (str)
                 db: the database object for checking for duplicates (obj)
-                rows: how many results to fetch at a time (int)
-                start: where to start in the results (int)
+                unique: return only unique hashes? [optional] (bool)
 
             Outputs:
                 Returns a list of processes (list of dicts)
@@ -531,25 +536,6 @@ class CarbonBlack:
         self.log.info(report)
         return report
 
-    def update_feed(self, feed, report):
-        '''
-            Updates a feed with a new report.
-
-            Inputs
-                feed: A feed (obj)
-                report: a report (dict)
-
-            Output
-                Returns the updated feed
-
-            > Note that this actually pulls all of the reports from the the feed, appends the new report, then
-                resubmits everything.
-        '''
-        self.log.info('[%s] Updating feed: {0}'.format(feed.id), self.class_name)
-        report = Report(self.cbth, initial_data=report, feed_id=feed.id)
-        feed.append_reports([report])
-
-        return feed
 
     #
     # CBC Live Response helpers
@@ -626,43 +612,49 @@ class CarbonBlack:
         '''
             Sends a LiveResponse command to an endpoint
 
-            Inputs:
+            Inputs
                 command: Command to execute
                 arguments: Supporting arguments for the command
 
-            Output:
-                Returns the raw JSON from the request
+            Outputs
+                data: Raw JSON from the request,
+                success: True/False
         '''
 
         self.log.info('[%s] Sending command to LR session: {0}'.format(command), self.class_name)
 
         if self.session_id is None:
-            self.log.info('Error: no session')
-            return 'Error: no session'
+            self.log.error('Error: no session')
+            return 'Error: no session', False
 
         if command not in self.supported_commands:
-            self.log.info('Error: command not in available commands: {0}'.format(command))
-            return 'Error: command not in available commands: {0}'.format(command)
+            self.log.error('Error: command not in available commands: {0}'.format(command))
+            return 'Error: command not in available commands: {0}'.format(command), False
 
-        url = '{0}/integrationServices/v3/cblr/session/{1}/command'.format(self.url, self.session_id)
-        headers = {
-            'Content-Type': 'application/json',
-            'X-Auth-Token': '{0}/{1}'.format(self.lr_api_key, self.lr_api_id)
-        }
+        try:
+            url = '{0}/integrationServices/v3/cblr/session/{1}/command'.format(self.url, self.session_id)
+            headers = {
+                'Content-Type': 'application/json',
+                'X-Auth-Token': '{0}/{1}'.format(self.lr_api_key, self.lr_api_id)
+            }
 
-        body = {
-            'session_id': self.session_id,
-            'name': command
-        }
-        if argument is not None:
-            body['object'] = argument
+            body = {
+                'session_id': self.session_id,
+                'name': command
+            }
+            if argument is not None:
+                body['object'] = argument
 
-        r = requests.post(url, headers=headers, json=body)
+            r = requests.post(url, headers=headers, json=body)
 
-        data = r.json()
+            data = r.json()
 
-        self.log.info(json.dumps(data, indent=4))
-        return data
+            self.log.info(json.dumps(data, indent=4))
+        except Exception as err:
+            error = 'Error: {0}'.format(err)
+            self.log.error(error)
+            return error, False
+        return data, True
 
     def command_status(self, command_id):
         '''
@@ -881,20 +873,27 @@ class Database:
             Output:
                 Returns the row ID of the new entry
         '''
+        if self.conn is None:
+            raise Exception('No connection to database')
 
         if md5 is None:
-            return 'Missing md5'
+            raise ValueError('Missing md5')
         if sha256 is None:
-            return 'Missing sha256'
+            raise ValueError('Missing sha256')
         if status is None:
-            return 'Missing status'
+            raise ValueError('Missing status')
+
+        if isinstance(md5, str) == False:
+            raise ValueError('md5 must be a string')
+        if isinstance(sha256, str) == False:
+            raise ValueError('sha256 must be a string')
+        if isinstance(status, str) == False:
+            raise ValueError('status must be a string')
 
         self.log.info('[%s] Adding file: MD5: {0}'.format(md5), self.class_name)
 
-        if self.conn is None:
-            return 'No connection to database'
         if self.get_file(md5=md5):
-            return 'File already exists'
+            raise FileExistsError(f'File already exists: {md5}')
 
         timestamp = convert_time('now')
         file_info = (timestamp, md5, sha256, status,)
@@ -916,8 +915,26 @@ class Database:
             Output:
                 Returns the results of the new row
         '''
+        if md5 is None:
+            raise ValueError('Missing md5')
+        if sha256 is None:
+            raise ValueError('Missing sha256')
+        if status is None:
+            raise ValueError('Missing status')
+
+        if isinstance(md5, str) == False:
+            raise ValueError('md5 must be a string')
+        if isinstance(sha256, str) == False:
+            raise ValueError('sha256 must be a string')
+        if isinstance(status, str) == False:
+            raise ValueError('status must be a string')
 
         self.log.info('[%s] Updating file: {0}'.format(md5), self.class_name)
+
+        if self.conn is None:
+            raise Exception('No connection to database')
+        if self.get_file(md5=md5) == None:
+            raise Exception(f'Unable to add file. File doesn\'t exist: {md5}')
 
         timestamp = convert_time('now')
         params = (timestamp, status, md5,)
@@ -942,6 +959,11 @@ class Database:
                 Returns the last pull timestamp from the database if timestamp is None
                 Returns the database response if timestamp == epoch or ISO8601
         '''
+        if self.conn is None:
+            raise Exception('No connection to database')
+
+        if timestamp is not None and isinstance(timestamp, str) == False:
+            raise Exception('Timestamp must be a string.')
 
         # Get or set last pull timestamp
         if timestamp is None:
@@ -963,6 +985,7 @@ class Database:
             cursor = self.conn.cursor()
             cursor.execute(sql, timestamp)
             self.conn.commit()
+            return True
 
 
 class Zscaler:
@@ -1037,28 +1060,32 @@ class Zscaler:
         '''
 
         self.log.info('[%s] Starting session', self.class_name)
-        timestamp, obf_api_key = self._obfuscate_api_key()
+        try:
+            timestamp, obf_api_key = self._obfuscate_api_key()
 
-        url = '{}/api/v1/authenticatedSession'.format(self.url)
-        headers = self.headers
-        data = {
-            'username': self.username,
-            'password': self.password,
-            'apiKey': obf_api_key,
-            'timestamp': str(timestamp)
-        }
+            url = '{}/api/v1/authenticatedSession'.format(self.url)
+            headers = self.headers
+            data = {
+                'username': self.username,
+                'password': self.password,
+                'apiKey': obf_api_key,
+                'timestamp': str(timestamp)
+            }
 
-        self.session = s = requests.Session()
+            self.session = s = requests.Session()
 
-        r = s.post(url, json=data, headers=headers)
+            r = s.post(url, json=data, headers=headers)
 
-        if r.status_code == 200:
-            self.session_id = r.cookies['JSESSIONID']
-            self.get_quota()
-            self.log.info('[%s] Session established. JSESSIONID: {}'.format(self.session_id), self.class_name)
+            if r.status_code == 200:
+                self.session_id = r.cookies['JSESSIONID']
+                self.get_quota()
+                self.log.info('[%s] Session established. JSESSIONID: {}'.format(self.session_id), self.class_name)
+                return s
+            else:
+                raise Exception(f'{r.status_code} {r.text}')
 
-        # Return the session
-        return s
+        except Exception as err:
+            self.log.exception(err)
 
     def get_report(self, md5):
         '''
@@ -1086,52 +1113,57 @@ class Zscaler:
             self.get_quota()
 
         if self.quota['unused'] == 0:
-            self.log.info('[%s] All queries for the day have been used. Max is {0}'.format(self.quota['allowed']),
+            self.log.warning('[%s] All queries for the day have been used. Max is {0}'.format(self.quota['allowed']),
                           self.class_name)
             return False
 
         # Zscaler throttles to 2 requests per second
         sleep(0.5)
 
-        # Get the report
-        url = '{0}/api/v1/sandbox/report/{1}'.format(self.url, md5)
-        headers = self.headers
-        s = self.session
-        r = s.get(url, headers=headers)
+        try:
+            # Get the report
+            url = '{0}/api/v1/sandbox/report/{1}'.format(self.url, md5)
+            headers = self.headers
+            s = self.session
+            r = s.get(url, headers=headers)
 
-        if r.status_code == 200:
-            self.quota['used'] += 1
-            self.quota['unused'] -= 1
+            if r.status_code == 200:
+                self.quota['used'] += 1
+                self.quota['unused'] -= 1
 
-            # Output a warning on low request counts remaining
-            if self.quota['unused'] < 100:
-                self.log.info('[%s] There are only {0} sandbox queries remaining'.format(self.quota['unused']),
-                              self.class_name)
+                # Output a warning on low request counts remaining
+                if self.quota['unused'] < 100:
+                    self.log.info('[%s] There are only {0} sandbox queries remaining'.format(self.quota['unused']),
+                                  self.class_name)
 
-            # If the response's Summary is a string, it's not a report
-            zs_report = None if isinstance(r.json()['Summary'], str) else r.json()['Summary']
+                # If the response's Summary is a string, it's not a report
+                zs_report = None if isinstance(r.json()['Summary'], str) else r.json()['Summary']
 
-            # If there was a report, return it
-            if zs_report is not None:
-                print(zs_report)
-                zs_type = zs_report['Classification']['Type']
-                self.log.info('[%s] Sandbox report Classification Type: {0}'.format(zs_type), self.class_name)
+                # If there was a report, return it
+                if zs_report is not None:
+                    print(zs_report)
+                    zs_type = zs_report['Classification']['Type']
+                    self.log.info('[%s] Sandbox report Classification Type: {0}'.format(zs_type), self.class_name)
+
+                    self.reports[md5] = zs_report
+                    return zs_report
+
+                else:
+                    self.log.info('[%s] Unknown file: {0}'.format(md5), self.class_name)
 
                 self.reports[md5] = zs_report
                 return zs_report
 
             else:
-                self.log.info('[%s] Unknown file: {0}'.format(md5), self.class_name)
+                raise Exception(f'{s.status_code} {s.text}')
+                self.log.error('[%s] Error: Status Code: {0}'.format(r.status_code), self.class_name)
+                self.log.error(r.text)
 
-            self.reports[md5] = zs_report
-            return zs_report
+            self.reports[md5] = None
+            return None
 
-        else:
-            self.log.info('[%s] Error: Status Code: {0}'.format(r.status_code), self.class_name)
-            self.log.info(r.text)
-
-        self.reports[md5] = None
-        return None
+        except Exception as err:
+            self.log.exception(err)
 
     def get_quota(self):
         '''
@@ -1147,19 +1179,24 @@ class Zscaler:
 
         if self.session is None:
             self.start_session()
-
-        # Get the report
-        url = '{0}/api/v1/sandbox/report/quota'.format(self.url)
-        headers = self.headers
-        s = self.session
-        r = s.get(url, headers=headers)
-
-        if r.status_code == 200:
-            data = r.json()[0]
-            self.quota = data
-            self.log.info('[%s] Quota used: {0} unused: {1} allowed: {2}'.format(data['used'],
-                                                                                 data['unused'],
-                                                                                 data['allowed']), self.class_name)
+        try:
+            # Get the report
+            url = '{0}/api/v1/sandbox/report/quota'.format(self.url)
+            headers = self.headers
+            s = self.session
+            r = s.get(url, headers=headers)
+    
+            if r.status_code == 200:
+                data = r.json()[0]
+                self.quota = data
+                self.log.info('[%s] Quota used: {0} unused: {1} allowed: {2}'.format(data['used'],
+                                                                                     data['unused'],
+                                                                                     data['allowed']), self.class_name)
+            else:
+                raise Exception(f'{s.status_code} {s.text}')
+                
+        except Exception as err:
+            self.log.exception(err)
 
 
 def convert_time(timestamp):

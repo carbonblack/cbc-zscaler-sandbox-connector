@@ -82,7 +82,7 @@ def take_action(cb_event, zs_report):
     # Create/update watchlist feed
     if 'watchlist' in actions and actions['watchlist'] is not None:
         md5 = cb_event['md5']
-        print(zs_report)
+
         # Shorten vaiables
         Status = zs_report['Summary']['Status']
         Category = zs_report['Summary']['Category']
@@ -103,9 +103,28 @@ def take_action(cb_event, zs_report):
                                                                                      Category, Score, DetectedMalware)
 
         severity = str(int(int(Score) / 10))
+        if severity == '0':
+            severity = '1'
+
         url = '{}/{}'.format(config['Zscaler']['url'], '#insights/web')
         tags = [Type, Category, FileType]
 
+        # Get the feed ready
+        if cb.iocs is None:
+            cb.iocs = []
+
+        feed = cb.get_feed(feed_name=actions['watchlist'])
+        if feed == None:
+            summary = 'MD5 indicators that tested positive in Zscaler Sandbox for one of \
+                      the following: {0}'.format(config['Zscaler']['bad_types'])
+            feed = cb.create_feed(actions['watchlist'], config['Zscaler']['url'], summary)
+
+        # Build a cache of the existing IOCs in the feed
+        for report in feed.reports:
+            for ioc in report.iocs_v2:
+                cb.iocs.append(ioc['values'])
+
+        # If we don't know about this IOC, add it
         if md5 not in cb.iocs:
             # Build the Report
             report = cb.create_report(timestamp, title, description, severity, url, tags, md5)
@@ -224,9 +243,10 @@ def process_events(events):
             difference = now - date_added
             hours = difference.seconds / 60 / 60
             days = hours / 24
+            cache_time = int(config['Zscaler']['unknown_cache'])
 
-            # If the last report is more than 90 days old, check again
-            if days >= 90:
+            # If the last report is more than `unknown_cache` days, check again
+            if days >= cache_time:
                 zs_report = zs.get_report(event['md5'])
                 zs_type = zs_report['Classification']['Type']
                 db.update_file(event['md5'], event['sha256'], zs_type)
@@ -240,11 +260,6 @@ def process_events(events):
 def main():
     # Get inits
     init()
-
-    feed = cb.get_feed(feed_name=config['actions']['watchlist'])
-    for report in feed.reports:
-        for ioc in report.iocs_v2:
-            print(ioc['values'])
 
     cbth_enabled = str2bool(config['CarbonBlack']['cbth_enabled'])
     cbd_enabled = str2bool(config['CarbonBlack']['cbd_enabled'])
@@ -287,15 +302,10 @@ def main():
 
 
     # If watchlists were enabled in take_action() and there were bad files, update the watchlist
-    if len(cb.new_reports):
+    if cb.new_reports is not None and len(cb.new_reports):
         feed = cb.get_feed(feed_name=config['actions']['watchlist'])
-
-        if feed == None:
-            summary = 'MD5 indicators that tested positive in Zscaler Sandbox for one of \
-                       the following: {0}'.format(config['Zscaler']['bad_types'])
-            feed = cb.create_feed(config['actions']['watchlist'], config['Zscaler']['url'], summary)
-
         feed.append_reports(cb.new_reports)
+        # feed.save()
     db.close()
 
 
