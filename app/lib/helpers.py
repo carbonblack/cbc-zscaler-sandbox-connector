@@ -44,33 +44,37 @@ class CarbonBlack:
             Outputs:
                 self
         '''
-        self.class_name = 'CarbonBlack'
-        self.log = log
-        self.log.info('[%s] Initializing', self.class_name)
+        try:
+            self.class_name = 'CarbonBlack'
+            self.log = log
+            self.log.info('[%s] Initializing', self.class_name)
 
-        self.config = config
-        self.url = config['CarbonBlack']['url']
-        self.org_key = config['CarbonBlack']['org_key']
-        self.api_id = config['CarbonBlack']['api_id']
-        self.api_key = config['CarbonBlack']['api_key']
-        self.cust_api_id = config['CarbonBlack']['custom_api_id']
-        self.cust_api_key = config['CarbonBlack']['custom_api_key']
-        self.lr_api_id = config['CarbonBlack']['lr_api_id']
-        self.lr_api_key = config['CarbonBlack']['lr_api_key']
-        self.cb = CbPSCBaseAPI(url=self.url, org_key=self.org_key,
-                               token='{0}/{1}'.format(self.cust_api_key, self.cust_api_id))
-        self.cbd = CbDefenseAPI(url=self.url, org_key=self.org_key,
-                                token='{0}/{1}'.format(self.api_key, self.api_id))
-        self.cbth = CbThreatHunterAPI(url=self.url, org_key=self.org_key,
-                                      token='{0}/{1}'.format(self.cust_api_key, self.cust_api_id))
-        # self.minimum_severity = int(config['CarbonBlack']['minimum_severity'])
-        self.time_bounds = None
-        self.device_id = None
-        self.session_id = None
-        self.supported_commands = None
-        self.feed = None
-        self.iocs = None
-        self.new_reports = []
+            self.config = config
+            self.url = config['CarbonBlack']['url']
+            self.org_key = config['CarbonBlack']['org_key']
+            self.api_id = config['CarbonBlack']['api_id']
+            self.api_key = config['CarbonBlack']['api_key']
+            self.cust_api_id = config['CarbonBlack']['custom_api_id']
+            self.cust_api_key = config['CarbonBlack']['custom_api_key']
+            self.lr_api_id = config['CarbonBlack']['lr_api_id']
+            self.lr_api_key = config['CarbonBlack']['lr_api_key']
+            self.cb = CbPSCBaseAPI(url=self.url, org_key=self.org_key,
+                                   token='{0}/{1}'.format(self.cust_api_key, self.cust_api_id))
+            self.cbd = CbDefenseAPI(url=self.url, org_key=self.org_key,
+                                    token='{0}/{1}'.format(self.api_key, self.api_id))
+            self.cbth = CbThreatHunterAPI(url=self.url, org_key=self.org_key,
+                                          token='{0}/{1}'.format(self.cust_api_key, self.cust_api_id))
+            # self.minimum_severity = int(config['CarbonBlack']['minimum_severity'])
+            self.time_bounds = None
+            self.device_id = None
+            self.session_id = None
+            self.supported_commands = None
+            self.feed = None
+            self.iocs = None
+            self.new_reports = []
+
+        except Exception as err:
+            self.log.exception(err)
 
     #
     # CBC Platform
@@ -87,35 +91,102 @@ class CarbonBlack:
         '''
 
         self.log.info('[%s] Getting alerts', self.class_name)
+        try:
+            query = self.cb.select(BaseAlert)
+            query = query.set_group_results(True)
+            query = query.set_minimum_severity(self.minimum_severity)
+            query = query.sort_by('first_event_time', 'DESC')
+            alerts = list(query)
 
-        query = self.cb.select(BaseAlert)
-        query = query.set_group_results(True)
-        query = query.set_minimum_severity(self.minimum_severity)
-        query = query.sort_by('first_event_time', 'DESC')
-        alerts = list(query)
+            self.log.info('[%s] Found {0} alerts'.format(len(alerts)), self.class_name)
+            return alerts
 
-        self.log.info('[%s] Found {0} alerts'.format(len(alerts)), self.class_name)
-        return alerts
+        except Exception as err:
+            self.log.exception(err)
 
     def get_device(self, device_id):
-        return self.cb.select(Device, device_id)
+        '''
+            Get a specific device's details.
+
+            Inputs
+                device_id (int):    The ID of the device
+
+            Raises
+                TypeError: When device_id is not an integer
+
+            Output
+                An object of the device
+        '''
+
+        if isinstance(device_id, int) == False:
+            raise TypeError('Expected device_id input type is string.')
+
+        try:
+            return self.cb.select(Device, device_id)
+
+        except Exception as err:
+            self.log.exception(err)
 
     def isolate_device(self, device_id):
-        device = self.get_device(device_id)
-        device.quarantine(True)
+        '''
+            Isolate a device.
 
-        return device
+            Inputs
+                device_id (int):    The ID of the device
+
+            Raises
+                TypeError when device_id is not an integer
+
+            Output
+                An object of the device
+        '''
+
+        if isinstance(device_id, int) == False:
+            raise TypeError('Expected device_id input type is string.')
+
+        try:
+            device = self.get_device(device_id)
+            device.quarantine(True)
+
+            return device
+
+        except Exception as err:
+            self.log.exception(err)
 
     def update_policy(self, device_id, policy_name):
-        device = self.get_device(device_id)
-        policies = self.cbd.select(Policy)
-        for policy in policies:
-            if policy.name == policy_name:
-                self.log.debug('[%s] Found policy {0} with id {1}'.format(policy_name, policy.id))
-                device.update_policy(policy.id)
-                return device
+        '''
+            Updates a device's policy to the given policy_name.
 
-        return None
+            Inputs
+                device_id (int):    The ID of the device
+                policy_name (str):  The name of the policy
+
+            Raises
+                TypeError when device_id is not an integer
+                TypeError when policy_name is not a string
+
+            Output
+                An object of the device
+        '''
+
+        if isinstance(device_id, int) == False:
+            raise TypeError('Expected device_id input type is integer.')
+        if isinstance(policy_name, str) == False:
+            raise TypeError('Expected policy_name input type is string.')
+
+        try:
+            device = self.get_device(device_id)
+            policies = self.cbd.select(Policy)
+            for policy in policies:
+                if policy.name == policy_name:
+                    self.log.debug('[%s] Found policy {0} with id {1}'.format(policy_name, policy.id))
+                    device.update_policy(policy.id)
+                    return device
+
+            return None
+
+        except Exception as err:
+            self.log.exception(err)
 
 
     #
@@ -125,128 +196,168 @@ class CarbonBlack:
         '''
             Get all events within the provided timespan.
 
-            Inputs:
-                timespan: The searchWindow from which to pull events [optional] (str)
+            Inputs
+                timespan (str): The searchWindow from which to pull events [optional]
                     3h for the past three hours - default
                     1d for the past one day
                     1w for the past one week
                     2w for the past two weeks
                     1m for the past one month
                     all for all
-                rows: number of results [optional] (int)
-                start: row at which to start [optional] (int)
-                unique: return only unique hashes? [optional] (bool)
+                rows (int):     Number of results [optional]
+                start (int):    Row at which to start [optional]
+                unique (bool):  Return only unique hashes? [optional]
 
-            Output:
-                A list of event objects
+            Raises
+                TypeError if timespan is not a string
+                TypeError if rows is not an integer
+                TypeError if start is not an integer
+                TypeError if unique is not a boolean
+                Exception if http response status_code is anything other than 200
+
+            Output
+                A list of all event objects if unique is False, only unique hashes if unique is True
         '''
 
         self.log.info('[%s] Getting events for the last {0}'.format(timespan), self.class_name)
 
-        # !!! There is a bug looping through events in CBAPI
-        # events = self.cbd.select(Event).where('searchWindow:3h')
+        if isinstance(timespan, str) == False:
+            raise TypeError('Expected timespan input type is string.')
+        if isinstance(rows, int) == False:
+            raise TypeError('Expected rows input type is integer.')
+        if isinstance(start, int) == False:
+            raise TypeError('Expected start input type is integer.')
+        if isinstance(unique, bool) == False:
+            raise TypeError('Expected unique input type is boolean.')
 
-        # for event in events:
-        #     raw_event = event.original_document
-        #     print(json.dumps(raw_event, indent=4))
-        #     return
+        try:
+            total_results = rows + 1
+            all_events = []
+            unique_events = []
+            event_tracking = []
 
-        total_results = rows + 1
-        all_events = []
-        unique_events = []
-        event_tracking = []
+            url = self.url + '/integrationServices/v3/event'
+            params = {
+                'searchWindow': timespan,
+                'rows': rows,
+                'start': start
+            }
+            headers = {
+                'Content-Type': 'application/json',
+                'X-Auth-Token': '{0}/{1}'.format(self.api_key, self.api_id)
+            }
 
-        url = self.url + '/integrationServices/v3/event'
-        params = {
-            'searchWindow': timespan,
-            'rows': rows,
-            'start': start
-        }
-        headers = {
-            'Content-Type': 'application/json',
-            'X-Auth-Token': '{0}/{1}'.format(self.api_key, self.api_id)
-        }
+            while params['start'] <= total_results:
+                r = requests.get(url=url, headers=headers, params=params)
 
-        while params['start'] <= total_results:
-            r = requests.get(url=url, headers=headers, params=params)
+                if r.status_code != 200:
+                    raise Exception('{0} {1}'.format(r.status_code, r.text))
+                    self.log.exception('[%s] {0} Error: {1}'.format(r.status_code, r.text), self.class_name)
 
-            if r.status_code != 200:
-                self.log.error('[%s] {0} Error: {1}'.format(r.status_code, r.text), self.class_name)
+                data = r.json()
+                for event in data['results']:
+                    reputation_filter = self.config['CarbonBlack']['reputation_filter'].split(',')
+                    effective_reputation = event['selectedApp']['effectiveReputation']
 
-            data = r.json()
-            for event in data['results']:
-                reputation_filter = self.config['CarbonBlack']['reputation_filter'].split(',')
-                effective_reputation = event['selectedApp']['effectiveReputation']
-                # Skip events that are not in the reputation_filter
-                if reputation_filter is not None and effective_reputation not in reputation_filter:
-                    pass
+                    # Skip events that are not in the reputation_filter
+                    if reputation_filter is not None and effective_reputation not in reputation_filter:
+                        continue
 
-                # Update root with things that might be required later
-                event['md5'] = event['selectedApp']['md5Hash']
-                event['sha256'] = event['selectedApp']['sha256Hash']
-                event['device_id'] = event['deviceDetails']['deviceId']
-                event['pid'] = event['processDetails']['processId']
-                event['type'] = 'cbd'
+                    # Update root with things that might be required later
+                    event['md5'] = event['selectedApp']['md5Hash']
+                    event['sha256'] = event['selectedApp']['sha256Hash']
+                    event['device_id'] = event['deviceDetails']['deviceId']
+                    event['pid'] = event['processDetails']['processId']
+                    event['type'] = 'cbd'
 
-                all_events.append(event)
+                    all_events.append(event)
 
-                # Filter unique events
-                if event['md5'] not in event_tracking:
-                    event_tracking.append(event['md5'])
-                    unique_events.append(event)
+                    # Filter unique events
+                    if event['md5'] not in event_tracking:
+                        event_tracking.append(event['md5'])
+                        unique_events.append(event)
 
-            params['start'] = params['start'] + rows
-            total_results = data['totalResults']
+                params['start'] = params['start'] + rows
+                total_results = data['totalResults']
 
-        self.log.info('[%s] Found {0} events, {1} unique events'.format(len(all_events), len(unique_events)),
-                      self.class_name)
-        if unique:
-            return unique_events
-        return all_events
+            self.log.info('[%s] Found {0} events, {1} unique events'.format(len(all_events), len(unique_events)),
+                          self.class_name)
+            if unique:
+                return unique_events
+
+            return all_events
+
+        except Exception as err:
+            self.log.exception(err)
 
     def get_event(self, event_id):
         '''
             Grab a single event's details from CB Defense.
 
-            Inputs:
-                event_id: the ID of the event to be pulled
-            Output:
+            Inputs
+                event_id (int): the ID of the event to be pulled
+
+            Raises
+                TypeError if event_id is not an integer
+                Exception if response status_code is not 200
+
+            Output
                 an object of the event, or the error message from a failed request
         '''
 
         self.log.info('[%s] Getting event details: {0}'.format(event_id), self.class_name)
 
-        r_url = '{0}/integrationServices/v3/event/{1}'.format(self.url, event_id)
-        headers = {
-            'Content-Type': 'application/json',
-            'X-Auth-Token': '{0}/{1}'.format(self.api_key, self.api_id)
-        }
-        r = requests.get(url=r_url, headers=headers)
+        if isinstance(event_id, int) == False:
+            raise TypeError('Expected event_id input type is integer.')
 
-        if r.status_code == 200:
-            event = r.json()
-            return event
+        try:
+            r_url = '{0}/integrationServices/v3/event/{1}'.format(self.url, event_id)
+            headers = {
+                'Content-Type': 'application/json',
+                'X-Auth-Token': '{0}/{1}'.format(self.api_key, self.api_id)
+            }
+            r = requests.get(url=r_url, headers=headers)
 
-        self.log.info('Error: {0}'.format(r.text))
-        return r.text
+            if r.status_code == 200:
+                event = r.json()
+                return event
+
+            self.log.exception('Error: {0} {1}'.format(r.status_code, r.text))
+            raise Exception(f'{r.status_code} {r.text}')
+
+        except Exception as err:
+            self.log.exception(err)
 
     def get_events_by_sha256(self, sha256):
         '''
             Get all events related to a SHA256 hash.
 
-            Inputs:
-                sha256: Hash for which to filter events (str)
+            Inputs
+                sha256 (str):   Hash for which to filter events
 
-            Output:
+            Raises
+                TypeError if sha256 is not a string
+                ValueError if sha256 is not 64 characters long
+
+            Output
                 A list of event objects
         '''
 
         self.log.info('[%s] Getting events by SHA256: {0}'.format(sha256), self.class_name)
 
-        events = list(self.cbd.select(Event).where('sha256Hash:{0}'.format(sha256)))
+        if isinstance(sha256, str) == False:
+            raise TypeError('Expected sha256 input type is string.')
+        if len(sha256) != 64:
+            raise ValueError('Expected sha256 to be 64 characters long')
 
-        self.log.info('[%s] Found {0} events with sha256 {1}'.format(len(events), sha256))
-        return events
+        try:
+            events = list(self.cbd.select(Event).where('sha256Hash:{0}'.format(sha256)))
+
+            self.log.info('[%s] Found {0} events with sha256 {1}'.format(len(events), sha256))
+            return events
+
+        except Exception as err:
+            self.log.exception(err)
 
     #
     # CBC Enterprise EDR
@@ -263,116 +374,141 @@ class CarbonBlack:
 
         self.log.info('[%s] Getting available data timespan', self.class_name)
 
-        endpoint = '{url}/threathunter/search/v1/orgs/{org_key}/processes/limits'.format(url=self.url,
-                                                                                         org_key=self.org_key)
-        headers = {
-            'X-Auth-Token': '{api_key}/{api_id}'.format(api_key=self.api_key, api_id=self.api_id)
-        }
-        r = requests.get(url=endpoint, headers=headers)
-        data = r.json()['time_bounds']
+        try:
+            endpoint = '{url}/threathunter/search/v1/orgs/{org_key}/processes/limits'.format(url=self.url,
+                                                                                             org_key=self.org_key)
+            headers = {
+                'X-Auth-Token': '{api_key}/{api_id}'.format(api_key=self.api_key, api_id=self.api_id)
+            }
+            r = requests.get(url=endpoint, headers=headers)
+            if r.status_code == 200:
+                data = r.json()['time_bounds']
 
-        self.log.info('[%s] Available time range is from {0} to {1}'.format(convert_time(data['lower']),
-                                                                            convert_time(data['upper'])),
-                      self.class_name)
+                self.log.info('[%s] Available time range is from {0} to {1}'.format(convert_time(data['lower']),
+                                                                                    convert_time(data['upper'])),
+                              self.class_name)
 
-        self.time_bounds = data
+                self.time_bounds = data
 
-        return data
+                return data
+
+            else:
+                raise Exception(f'{r.status_code} {r.text}')
+
+        except Exception as err:
+            self.log.exception(err)
 
     def get_processes(self, query, db, unique=False):
         '''
             Get process search results from CBC Enterprise EDR
 
-            Inputs:
-                query: the query to be submitted (str)
-                db: the database object for checking for duplicates (obj)
-                unique: return only unique hashes? [optional] (bool)
+            Inputs
+                query (str):    the query to be submitted
+                db (obj):       the database object for checking for duplicates
+                unique (bool):  return only unique hashes? [optional]
 
-            Outputs:
+            Raises
+                TypeError if query is not a string
+                TypeError if db is not an object
+                TypeError if unique is not a boolean
+
+            Outputs
                 Returns a list of processes (list of dicts)
         '''
 
+
+        if isinstance(query, str) == False:
+            raise TypeError('Expected query input type is string.')
+        if isinstance(db, object) == False:
+            raise TypeError('Expected db input type is object.')
+        if isinstance(unique, bool) == False:
+            raise TypeError('Expected unique input type is boolean.')
+
         self.log.info('[%s] Getting processes: "{0}"'.format(query), self.class_name)
 
-        all_procs = []
-        proc_tracker = []
-        unique_procs = []
-        hash_tracker = {}
+        try:
+            all_procs = []
+            proc_tracker = []
+            unique_procs = []
+            hash_tracker = {}
 
-        processes = self.cbth.select(Process).where(query).sort_by('device_timestamp', 'DESC')
+            processes = self.cbth.select(Process).where(query).sort_by('device_timestamp', 'DESC')
 
-        for process in processes:
-            # Get the raw JSON
-            raw_proc = process.original_document
-            raw_proc['type'] = 'cbth'
-            raw_proc['pid'] = raw_proc['process_pid'][0]
-            # print(json.dumps(raw_proc))
+            for process in processes:
+                # Get the raw JSON
+                raw_proc = process.original_document
+                raw_proc['type'] = 'cbth'
+                raw_proc['pid'] = raw_proc['process_pid'][0]
+                # print(json.dumps(raw_proc))
 
-            # Sometimes we don't have a hash. Skip these
-            if 'process_hash' not in raw_proc:
-                self.log.info('[%s] Process is missing MD5 and SHA256. Skipping.', self.class_name)
-                continue
+                # Sometimes we don't have a hash. Skip these
+                if 'process_hash' not in raw_proc:
+                    self.log.info('[%s] Process is missing MD5 and SHA256. Skipping.', self.class_name)
+                    continue
 
-            # Sometimes we only have 1 hash type
-            if len(raw_proc['process_hash']) == 1:
-                # If it is an MD5
-                if len(raw_proc['process_hash'][0]) == 32:
-                    self.log.info('[%s] Process is missing the SHA256', self.class_name)
-                    raw_proc['md5'] = raw_proc['process_hash'][0]
+                # Sometimes we only have 1 hash type
+                if len(raw_proc['process_hash']) == 1:
+                    # If it is an MD5
+                    if len(raw_proc['process_hash'][0]) == 32:
+                        self.log.info('[%s] Process is missing the SHA256', self.class_name)
+                        raw_proc['md5'] = raw_proc['process_hash'][0]
 
-                    # If we are tracking the hash, use it's value
-                    if raw_proc['md5'] in hash_tracker.keys():
-                        raw_proc['sha256'] = hash_tracker[raw_proc['md5']]
+                        # If we are tracking the hash, use it's value
+                        if raw_proc['md5'] in hash_tracker.keys():
+                            raw_proc['sha256'] = hash_tracker[raw_proc['md5']]
 
-                    # Otherwise fill with 0's
-                    else:
-                        raw_proc['sha256'] = '0'*64
-
-                # If we only have the sha256
-                else:
-                    self.log.info('[%s] Process is missing the MD5', self.class_name)
-                    raw_proc['sha256'] = raw_proc['process_hash'][0]
-
-                    # If we are tracking the sha256, grab the md5
-                    if raw_proc['sha256'] in hash_tracker.values():
-                        md5s = hash_tracker.keys()
-                        sha256s = hash_tracker.values()
-                        raw_proc['md5'] = list(md5s)[list(sha256s).index(raw_proc['sha256'])]
-
-                    # If we aren't tracking the sha256
-                    else:
-                        # Get the metadata. Sometimes that has the md5
-                        metadata = self.get_metadata(raw_proc['process_hash'][0])
-
-                        # If it has the md5, save it
-                        if metadata is not None:
-                            raw_proc['md5'] = metadata['md5']
-
-                        # Since Zscaler Sandbox requires an md5, skip if we can't find the md5
+                        # Otherwise fill with 0's
                         else:
-                            self.log.info('[%s] Unable to get file metadata. Skipping.', self.class_name)
-                            continue
+                            raw_proc['sha256'] = '0'*64
 
-            # Usually we have both hashes
-            if len(raw_proc['process_hash']) == 2:
-                raw_proc['md5'] = raw_proc['process_hash'][0]
-                raw_proc['sha256'] = raw_proc['process_hash'][1]
+                    # If we only have the sha256
+                    else:
+                        self.log.info('[%s] Process is missing the MD5', self.class_name)
+                        raw_proc['sha256'] = raw_proc['process_hash'][0]
 
-            # Track the hashes to prevent redundant API lookups
-            if raw_proc['md5'] not in hash_tracker.keys():
-                hash_tracker[raw_proc['md5']] = raw_proc['sha256']
+                        # If we are tracking the sha256, grab the md5
+                        if raw_proc['sha256'] in hash_tracker.values():
+                            md5s = hash_tracker.keys()
+                            sha256s = hash_tracker.values()
+                            raw_proc['md5'] = list(md5s)[list(sha256s).index(raw_proc['sha256'])]
 
-            # Save the process
-            all_procs.append(raw_proc)
+                        # If we aren't tracking the sha256
+                        else:
+                            # Get the metadata. Sometimes that has the md5
+                            metadata = self.get_metadata(raw_proc['process_hash'][0])
 
-            # Filter out things we already checked
-            if raw_proc['sha256'] not in unique_procs:
-                unique_procs.append(raw_proc)
+                            # If it has the md5, save it
+                            if metadata is not None:
+                                raw_proc['md5'] = metadata['md5']
 
-        self.log.info('[%s] Found {0} unique processes'.format(len(unique_procs)), self.class_name)
-        if unique:
-            return unique_procs
-        return all_procs
+                            # Since Zscaler Sandbox requires an md5, skip if we can't find the md5
+                            else:
+                                self.log.info('[%s] Unable to get file metadata. Skipping.', self.class_name)
+                                continue
+
+                # Usually we have both hashes
+                if len(raw_proc['process_hash']) == 2:
+                    raw_proc['md5'] = raw_proc['process_hash'][0]
+                    raw_proc['sha256'] = raw_proc['process_hash'][1]
+
+                # Track the hashes to prevent redundant API lookups
+                if raw_proc['md5'] not in hash_tracker.keys():
+                    hash_tracker[raw_proc['md5']] = raw_proc['sha256']
+
+                # Save the process
+                all_procs.append(raw_proc)
+
+                # Filter out things we already checked
+                if raw_proc['sha256'] not in unique_procs:
+                    unique_procs.append(raw_proc)
+
+            self.log.info('[%s] Found {0} unique processes'.format(len(unique_procs)), self.class_name)
+            if unique:
+                return unique_procs
+            return all_procs
+
+        except Exception as err:
+            self.log.exception(err)
 
     def get_metadata(self, sha256):
         '''
@@ -380,30 +516,45 @@ class CarbonBlack:
                 isn't included in the process request. This will get the metadata
                 of the file which does contain the MD5.
 
-            Inputs:
-                sha256: Hash of the file to be pulled
+            Inputs
+                sha256:     Hash of the file to be pulled
+
+            Raises
+                TypeError if sha256 is not a sring
+                ValueError if sha256 is not 64 characters long
 
             Outputs:
-                Raw JSON of the request
+                Raw JSON of the request if metadata was found
+                None of no metadata was found
         '''
 
         self.log.info('[%s] Getting file metadata: {0}'.format(sha256), self.class_name)
 
-        endpoint = '{url}/ubs/v1/orgs/{org_key}/sha256/{sha256}/metadata'.format(url=self.url,
-                                                                                 org_key=self.org_key,
-                                                                                 sha256=sha256)
-        headers = {
-            'X-Auth-Token': '{api_key}/{api_id}'.format(api_key=self.api_key,
-                                                        api_id=self.api_id),
-            'Content-Type': 'application/json'
-        }
-        r = requests.get(url=endpoint, headers=headers)
-        if r.status_code == 200:
-            self.log.info('[%s] Metadata found for file: {0}'.format(sha256), self.class_name)
-            return r.json()
-        else:
-            self.log.info('[%s] Metadata NOT found for file: {0}'.format(sha256), self.class_name)
-            return None
+        if isinstance(sha256, str) == False:
+            raise TypeError('Expected sha256 input type is string.')
+        if len(sha256) != 64:
+            raise ValueError('Expected sha256 to be 64 characters long')
+
+        try:
+            endpoint = '{url}/ubs/v1/orgs/{org_key}/sha256/{sha256}/metadata'.format(url=self.url,
+                                                                                     org_key=self.org_key,
+                                                                                     sha256=sha256)
+            headers = {
+                'X-Auth-Token': '{api_key}/{api_id}'.format(api_key=self.api_key,
+                                                            api_id=self.api_id),
+                'Content-Type': 'application/json'
+            }
+            r = requests.get(url=endpoint, headers=headers)
+            if r.status_code == 200:
+                self.log.info('[%s] Metadata found for file: {0}'.format(sha256), self.class_name)
+                return r.json()
+
+            else:
+                self.log.info('[%s] Metadata NOT found for file: {0}'.format(sha256), self.class_name)
+                return None
+
+        except Exception as err:
+            self.log.exception(err)
 
     def get_all_feeds(self):
         '''
@@ -411,15 +562,19 @@ class CarbonBlack:
 
             Inputs: None
 
-            Output:
+            Output
                 An object of the feeds
         '''
 
         self.log.info('[%s] Getting all feeds', self.class_name)
 
-        feeds = self.cbth.select(Feed)
-        self.log.info('[%s] Pulled {0} feeds'.format(len(feeds)), self.class_name)
-        return feeds
+        try:
+            feeds = self.cbth.select(Feed)
+            self.log.info('[%s] Pulled {0} feeds'.format(len(feeds)), self.class_name)
+            return feeds
+
+        except Exception as err:
+            self.log.exception(err)
 
     def get_feed(self, feed_id=None, feed_name=None):
         '''
@@ -427,115 +582,174 @@ class CarbonBlack:
                 pull all feeds and filter by name. If feed_id is provided, it
                 pulls based on that id.
 
-            Inputs:
-                feed_id: ID of the feed to pull (int)
-                feed_name: Name of the feed to pull (str)
+            Inputs
+                feed_id (int):      ID of the feed to pull (int)
+                feed_name (str):    Name of the feed to pull (str)
+
+            Raises
+                TypeError when feed_id is not an integer
+                TypeError when feed_name is not a string
 
             Outputs
-                Object  - an object of found feed
-                None    - no feed was found
-                False   - both feed_id and feed_name provided
-                False   - neither feed_id nor feed_name provided
+                Object  an object of found feed
+                None    no feed was found
+                False   both feed_id and feed_name provided
+                False   neither feed_id nor feed_name provided
         '''
 
         self.log.info('[%s] Getting feed: {0}'.format(feed_id), self.class_name)
 
+        if isinstance(feed_id, int) == False:
+            raise TypeError('Expected feed_id input type is integer.')
+        if isinstance(feed_name, str) == False:
+            raise TypeError('Expected feed_name input type is string.')
+
         if feed_id is None and feed_name is None:
             self.log.info('[%s] Missing feed_id and feed_name. Need at least one', self.class_name)
-            return False
+            raise Exception('Missing feed_id and feed_name. Need at least one')
 
         if feed_id is not None and feed_name is not None:
             self.log.info('[%s] Both feed_id and feed_name provided. Please only provide one', self.class_name)
-            return False
+            raise Exception('Both feed_id and feed_name provided. Please only provide one')
 
-        # If the feed_name was provided, get all the feeds and check their names
-        if feed_name is not None:
-            feeds = self.get_all_feeds()
-            for feed in feeds:
-                if feed.name == feed_name:
-                    feed_id = feed.id
-                    break
+        try:
+            # If the feed_name was provided, get all the feeds and check their names
+            if feed_name is not None:
+                feeds = self.get_all_feeds()
+                for feed in feeds:
+                    if feed.name == feed_name:
+                        feed_id = feed.id
+                        break
 
-        # If no feeds were found, return None
-        if feed_id is None:
-            self.log.info('[%s] No feed found')
-            return None
+            # If no feeds were found, return None
+            if feed_id is None:
+                self.log.info('[%s] No feed found')
+                return None
 
-        feed = self.cbth.select(Feed, feed_id)
-        self.log.info('[%s] {0}'.format(feed), self.class_name)
+            feed = self.cbth.select(Feed, feed_id)
+            self.log.info('[%s] {0}'.format(feed), self.class_name)
 
-        return feed
+            return feed
+
+        except Exception as err:
+            self.log.exception(err)
 
     def create_feed(self, name, url, summary):
         '''
             Creates a new feed in CBC Enterprise EDR
 
-            Inputs:
-                name: Name of the feed to create (str)
-                url: URL of the feed (str)
-                summary: Summary of the feed (str)
+            Inputs
+                name (str):     Name of the feed to create
+                url (str):      URL of the feed
+                summary (str):  Summary of the feed
 
-            Output:
+            Raises
+                TypeError when name is not a string
+                TypeError when url is not a string
+                TypeError when summary is not a string
+
+            Output
                 An object of the newly created feed
         '''
 
-        feed_info = {
-            'name': name,
-            'owner': self.org_key,
-            'provider_url': url,
-            'summary': summary,
-            'category': 'Partner',
-            'access': 'private',
-        }
+        if isinstance(name, str) == False:
+            raise TypeError('Expected name input type is string.')
+        if isinstance(url, str) == False:
+            raise TypeError('Expected url input type is string.')
+        if isinstance(summary, str) == False:
+            raise TypeError('Expected summary input type is string.')
 
-        feed = {
-            'feedinfo': feed_info,
-            'reports': []
-        }
+        try:
+            feed_info = {
+                'name': name,
+                'owner': self.org_key,
+                'provider_url': url,
+                'summary': summary,
+                'category': 'Partner',
+                'access': 'private',
+            }
 
-        feed = self.cbth.create(Feed, feed)
-        feed.save()
+            feed = {
+                'feedinfo': feed_info,
+                'reports': []
+            }
 
-        return feed
+            feed = self.cbth.create(Feed, feed)
+            feed.save()
+
+            return feed
+
+        except Exception as err:
+            self.log.exception(err)
 
     def create_report(self, timestamp, title, description, severity, link, tags, md5):
         '''
             Creates a report for Enterprise EDR feeds
 
-            Inputs:
-                timestamp: Epoch timestamp to be added to the report (int)
-                title: Title of the report (str)
-                description: Description of the report (str)
-                severity: Severity of the report [1-10] (int)
-                link: Link to report (str)
-                tags: List of tags (list of str)
-                md5: Hash IOC to be added to the report (str)
+            Inputs
+                timestamp (int):    Epoch timestamp to be added to the report
+                title (str):        Title of the report
+                description (str):  Description of the report
+                severity (int):     Severity of the report [1-10]
+                link (str):         Link to report
+                tags (list of str): List of tags
+                md5 (str):          Hash IOC to be added to the report
 
-            Output:
+            Raises
+                TypeError if timestamp is not an integer
+                TypeError if title is not a string
+                TypeError if description is not a string
+                TypeError if severity is not a string
+                TypeError if link is not a string
+                TypeError if tags is not a list
+                TypeError if md5 is not a string
+                ValueError if md5 is not 32 characters long
+
+            Output
                 An object of the newly created report
         '''
 
+        if isinstance(timestamp, int) == False:
+            raise TypeError('Expected timestamp input type is integer.')
+        if isinstance(title, str) == False:
+            raise TypeError('Expected title input type is string.')
+        if isinstance(description, str) == False:
+            raise TypeError('Expected description input type is string.')
+        if isinstance(severity, str) == False:
+            raise TypeError('Expected severity input type is string.')
+        if isinstance(link, str) == False:
+            raise TypeError('Expected link input type is string.')
+        if isinstance(tags, list) == False:
+            raise TypeError('Expected tags input type is a list of strings.')
+        if isinstance(md5, str) == False:
+            raise TypeError('Expected md5 input type is string.')
+        if len(md5) != 32:
+            raise ValueError('Expected md5 to be 32 characters long')
+
         self.log.info('[%s] Creating new Report:', self.class_name)
 
-        report = {
-            'id': str(uuid.uuid4()),
-            'timestamp': timestamp,
-            'title': title,
-            'description': description,
-            'severity': severity,
-            'link': link,
-            'tags': tags,
-            'iocs': {
-                'md5': [md5]
+        try:
+            report = {
+                'id': str(uuid.uuid4()),
+                'timestamp': timestamp,
+                'title': title,
+                'description': description,
+                'severity': severity,
+                'link': link,
+                'tags': tags,
+                'iocs': {
+                    'md5': [md5]
+                }
             }
-        }
 
-        report = self.cbth.create(Report, report)
+            report = self.cbth.create(Report, report)
 
-        self.log.info('[%s] Created report', self.class_name)
-        self.log.info(report)
-        return report
+            self.log.info('[%s] Created report', self.class_name)
+            self.log.info(report)
+            return report
 
+        except Exception as err:
+            self.log.exception(err)
 
     #
     # CBC Live Response helpers
@@ -545,35 +759,49 @@ class CarbonBlack:
             Starts a CBC LiveResponse session. The session_id is saved in
                 self.session_id
 
-            Inputs:
-                device_id: ID of the device to start the session on (int)
-                wait: Hold the HTTP request while waiting for the session to establish (bool)
+            Inputs
+                device_id (int):    ID of the device to start the session on
+                wait (bool):        Hold the HTTP request while waiting for the session to establish
 
-            Output:
-                Raw JSON of the response. Contains the session_id for use later
+            Raises
+                TypeError when device_id is not an integer
+                TypeError when wait is not a boolean
+                Exception when response status_code is anything other than 200
+
+            Output
+                data (dict):    Raw JSON of the response. Contains the session_id for use later
         '''
 
-        self.log.info('[%s] Starting LR session', self.class_name)
-        url = '{0}/integrationServices/v3/cblr/session/{1}'.format(self.url, device_id)
-        params = {'wait': wait}
-        headers = {
-            'Content-Type': 'application/json',
-            'X-Auth-Token': '{0}/{1}'.format(self.lr_api_key, self.lr_api_id)
-        }
-        r = requests.post(url, params=params, headers=headers)
+        if isinstance(device_id, int) == False:
+            raise TypeError('Expected device_id input type is integer.')
+        if isinstance(wait, bool) == False:
+            raise TypeError('Expected wait input type is boolean.')
 
-        if r.status_code == 200:
-            data = r.json()
+        try:
+            self.log.info('[%s] Starting LR session', self.class_name)
+            url = '{0}/integrationServices/v3/cblr/session/{1}'.format(self.url, device_id)
+            params = { 'wait': wait }
+            headers = {
+                'Content-Type': 'application/json',
+                'X-Auth-Token': '{0}/{1}'.format(self.lr_api_key, self.lr_api_id)
+            }
+            r = requests.post(url, params=params, headers=headers)
 
-            self.device_id = device_id
-            self.session_id = data['id']
-            self.supported_commands = data['supported_commands']
+            if r.status_code == 200:
+                data = r.json()
 
-            self.log.info(json.dumps(data, indent=4))
-            return data
+                self.device_id = device_id
+                self.session_id = data['id']
+                self.supported_commands = data['supported_commands']
 
-        else:
-            return r.text
+                self.log.info(json.dumps(data, indent=4))
+                return data
+
+            else:
+                raise Exception(f'{r.status_code} {r.text}')
+
+        except Exception as err:
+            self.log.exception(err)
 
     def get_session(self):
         '''
@@ -581,115 +809,148 @@ class CarbonBlack:
 
             Inputs: None
 
-            Output:
-                Returns the raw JSON of the request
+            Raises
+                Exception if no session is established
+                Exception if response status_code is not 200
+
+            Output
+                data (dict):    Returns the raw JSON of the request
         '''
 
-        if self.session_id is None:
-            self.log.info('[%s] Cannot get session status. No session established'.format(self.session_id),
-                          self.class_name)
-            return 'No session established'
+        try:
+            if self.session_id is None:
+                self.log.info('[%s] Cannot get session status. No session established'.format(self.session_id),
+                              self.class_name)
+                raise Exception('No session established')
 
-        self.log.info('[%s] Getting status of session: {0}'.format(self.session_id), self.class_name)
+            self.log.info('[%s] Getting status of session: {0}'.format(self.session_id), self.class_name)
 
-        url = '{0}/integrationServices/v3/cblr/session/{1}'.format(self.url, self.session_id)
-        headers = {
-            'Content-Type': 'application/json',
-            'X-Auth-Token': '{0}/{1}'.format(self.lr_api_key, self.lr_api_id)
-        }
-        r = requests.get(url, headers=headers)
+            url = '{0}/integrationServices/v3/cblr/session/{1}'.format(self.url, self.session_id)
+            headers = {
+                'Content-Type': 'application/json',
+                'X-Auth-Token': '{0}/{1}'.format(self.lr_api_key, self.lr_api_id)
+            }
+            r = requests.get(url, headers=headers)
 
-        if r.status_code == 200:
-            data = r.json()
-            self.log.info(json.dumps(data, indent=4))
-            self.supported_commands = data['supported_commands']
+            if r.status_code == 200:
+                data = r.json()
+                self.log.info(json.dumps(data, indent=4))
+                self.supported_commands = data['supported_commands']
 
-            return data
-        else:
-            return r.text
+                return data
+
+            else:
+                raise Exception(f'{r.status_code} {r.text}')
+
+        except Exception as err:
+            self.log.exception(err)
 
     def send_command(self, command, argument=None):
         '''
             Sends a LiveResponse command to an endpoint
 
             Inputs
-                command: Command to execute
-                arguments: Supporting arguments for the command
+                command (str):      Command to execute
+                arguments (str):    Supporting arguments for the command
+
+            Raises
+                TypeError if command is not a string
+                TypeError if argument is not a string or None
 
             Outputs
-                data: Raw JSON from the request,
-                success: True/False
+                data (dict): Raw JSON from the request
         '''
+
+        if isinstance(command, str) == False:
+            raise TypeError('Expected command input type is string.')
+        if argument is not None or isinstance(argument, str) == False:
+            raise TypeError('Expected argument input type is string or None.')
 
         self.log.info('[%s] Sending command to LR session: {0}'.format(command), self.class_name)
 
-        if self.session_id is None:
-            self.log.error('Error: no session')
-            return 'Error: no session', False
-
-        if command not in self.supported_commands:
-            self.log.error('Error: command not in available commands: {0}'.format(command))
-            return 'Error: command not in available commands: {0}'.format(command), False
-
         try:
-            url = '{0}/integrationServices/v3/cblr/session/{1}/command'.format(self.url, self.session_id)
-            headers = {
-                'Content-Type': 'application/json',
-                'X-Auth-Token': '{0}/{1}'.format(self.lr_api_key, self.lr_api_id)
-            }
+            if self.session_id is None:
+                self.log.error('Error: no session')
+                return 'Error: no session'
 
-            body = {
-                'session_id': self.session_id,
-                'name': command
-            }
-            if argument is not None:
-                body['object'] = argument
+            if command not in self.supported_commands:
+                self.log.error('Error: command not in available commands: {0}'.format(command))
+                return 'Error: command not in available commands: {0}'.format(command)
 
-            r = requests.post(url, headers=headers, json=body)
+            try:
+                url = '{0}/integrationServices/v3/cblr/session/{1}/command'.format(self.url, self.session_id)
+                headers = {
+                    'Content-Type': 'application/json',
+                    'X-Auth-Token': '{0}/{1}'.format(self.lr_api_key, self.lr_api_id)
+                }
 
-            data = r.json()
+                body = {
+                    'session_id': self.session_id,
+                    'name': command
+                }
+                if argument is not None:
+                    body['object'] = argument
 
-            self.log.info(json.dumps(data, indent=4))
+                r = requests.post(url, headers=headers, json=body)
+
+                data = r.json()
+
+                self.log.info(json.dumps(data, indent=4))
+
+                return data
+
+            except Exception as err:
+                self.log.exception(err)
+
         except Exception as err:
-            error = 'Error: {0}'.format(err)
-            self.log.error(error)
-            return error, False
-        return data, True
+            self.log.exception(err)
 
     def command_status(self, command_id):
         '''
             Get the status of a previously submitted command
 
-            Inputs:
-                command_id: ID of the command previously submitted (int)
+            Inputs
+                command_id (int):   ID of the command previously submitted
+
+            Raises
+                TypeError if command_id is not an integer
+                Exception if no session is established
 
             Output:
                 Raw JSON of the response
         '''
 
+        if isinstance(command_id, int) == False:
+            raise TypeError('Expected command_id input type is integer.')
+
         self.log.info('[%s] Getting status of LR command: {0}'.format(command_id), self.class_name)
 
-        if self.session_id is None:
-            self.log.info('[%s] Cannot get session status. No session established'.format(self.session_id),
-                          self.class_name)
-            return 'No session established'
+        try:
+            if self.session_id is None:
+                self.log.info('[%s] Cannot get session status. No session established'.format(self.session_id),
+                              self.class_name)
+                raise Exception('No session established')
 
-        self.log.info('[%s] Getting status of command: {0}'.format(command_id), self.class_name)
+            self.log.info('[%s] Getting status of command: {0}'.format(command_id), self.class_name)
 
-        url = '{0}/integrationServices/v3/cblr/session/{1}/command/{2}'.format(self.url, self.session_id, command_id)
-        headers = {
-            'Content-Type': 'application/json',
-            'X-Auth-Token': '{0}/{1}'.format(self.lr_api_key, self.lr_api_id)
-        }
-        r = requests.get(url, headers=headers)
+            url = '{0}/integrationServices/v3/cblr/session/{1}/command/{2}'.format(self.url, self.session_id, command_id)
+            headers = {
+                'Content-Type': 'application/json',
+                'X-Auth-Token': '{0}/{1}'.format(self.lr_api_key, self.lr_api_id)
+            }
+            r = requests.get(url, headers=headers)
 
-        if r.status_code == 200:
-            data = r.json()
+            if r.status_code == 200:
+                data = r.json()
 
-            self.log.info(json.dumps(data, indent=4))
-            return data
-        else:
-            return r.text
+                self.log.info(json.dumps(data, indent=4))
+                return data
+
+            else:
+                raise Exception(f'{r.status_code} {r.text}')
+
+        except Exception as err:
+            self.log.exception(err)
 
     def close_session(self):
         '''
@@ -697,7 +958,7 @@ class CarbonBlack:
 
             Inputs: None
 
-            Outputs:
+            Outputs
                 Raw JSON response from the request
 
             > Note: When closing a LR session on an endpoint, if there are any
@@ -706,27 +967,31 @@ class CarbonBlack:
 
         self.log.info('[%s] Closing session: {0}'.format(self.session_id), self.class_name)
 
-        if self.session_id is None:
-            self.log.info('Error: no session')
-            return 'Error: no session'
+        try:
+            if self.session_id is None:
+                self.log.info('Error: no session')
+                return 'Error: no session'
 
-        url = '{0}/integrationServices/v3/cblr/session'.format(self.url)
-        headers = {
-            'Content-Type': 'application/json',
-            'X-Auth-Token': '{0}/{1}'.format(self.lr_api_key, self.lr_api_id)
-        }
+            url = '{0}/integrationServices/v3/cblr/session'.format(self.url)
+            headers = {
+                'Content-Type': 'application/json',
+                'X-Auth-Token': '{0}/{1}'.format(self.lr_api_key, self.lr_api_id)
+            }
 
-        body = {
-            'session_id': self.session_id,
-            'status': 'CLOSE'
-        }
+            body = {
+                'session_id': self.session_id,
+                'status': 'CLOSE'
+            }
 
-        r = requests.put(url, headers=headers, json=body)
+            r = requests.put(url, headers=headers, json=body)
 
-        data = r.json()
+            data = r.json()
 
-        self.log.info(json.dumps(data, indent=4))
-        return data
+            self.log.info(json.dumps(data, indent=4))
+            return data
+
+        except Exception as err:
+            self.log.exception(err)
 
 
 class Database:
@@ -739,74 +1004,90 @@ class Database:
             Initialise the database object. Create database and tables if they
                 don't exist.
 
-            Inputs:
-                config: Dict containing settings from config.ini
+            Inputs
+                config (str):   Dict containing settings from config.ini
 
             Output:
                 self
         '''
-        self.class_name = 'Database'
-        self.log = log
-        self.log.info('[%s] Initializing', self.class_name)
-
-        self.config = config
-        self.conn = None
-        self.connect(config['sqlite3']['filename'])
-
-        sql = [
-            '''CREATE TABLE IF NOT EXISTS files (
-                id integer PRIMARY KEY,
-                timestamp text,
-                md5 text,
-                sha256 text,
-                status text
-            );''',
-
-            '''CREATE TABLE IF NOT EXISTS alerts (
-                id integer PRIMARY KEY,
-                timestamp text
-            );''',
-
-            '''SELECT * FROM alerts'''
-        ]
 
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(sql[0])
-            cursor.execute(sql[1])
-            cursor.execute(sql[2])
-            rows = cursor.fetchall()
-            if len(rows) == 0:
-                sql = '''INSERT INTO alerts(timestamp) VALUES(?)'''
-                cursor.execute(sql, (convert_time('now'),))
-                self.conn.commit()
-                self.log.info('[%s] Created tables and added current timestamp as last pull time', self.class_name)
-        except Error as e:
-            self.log.info(e)
+            self.class_name = 'Database'
+            self.log = log
+            self.log.info('[%s] Initializing', self.class_name)
+
+            self.config = config
+            self.conn = None
+            self.connect(config['sqlite3']['filename'])
+
+            sql = [
+                '''CREATE TABLE IF NOT EXISTS files (
+                    id integer PRIMARY KEY,
+                    timestamp text,
+                    md5 text,
+                    sha256 text,
+                    status text
+                );''',
+
+                '''CREATE TABLE IF NOT EXISTS alerts (
+                    id integer PRIMARY KEY,
+                    timestamp text
+                );''',
+
+                '''SELECT * FROM alerts'''
+            ]
+
+            try:
+                cursor = self.conn.cursor()
+                cursor.execute(sql[0])
+                cursor.execute(sql[1])
+                cursor.execute(sql[2])
+                rows = cursor.fetchall()
+                if len(rows) == 0:
+                    sql = '''INSERT INTO alerts(timestamp) VALUES(?)'''
+                    cursor.execute(sql, (convert_time('now'),))
+                    self.conn.commit()
+                    self.log.info('[%s] Created tables and added current timestamp as last pull time', self.class_name)
+            except Exception as err:
+                self.log.exception(err)
+
+        except Exception as err:
+            self.log.exception(err)
 
     def connect(self, db_file):
         '''
             Connects to the sqlite3 database
 
-            Inputs:
-                db_file: The name of the database file (str)
+            Inputs
+                db_file (str):  The name of the database file (str)
 
-            Output:
-                Returns an object of the connection
+            Raises
+                TypeError if db_file is not a string
+
+            Output
+                conn (obj): Returns an object of the connection
         '''
 
+        if isinstance(db_file, str) == False:
+            raise TypeError('Expected type of db_file is string.')
+
         self.log.info('[%s] Connecting to database: {0}'.format(db_file), self.class_name)
-        if self.conn is not None:
-            self.log.info('[%s] Connection is already established', self.class_name)
-            return self.conn
 
         try:
-            self.conn = sqlite3.connect(os.path.join(os.getcwd(), db_file))
-            self.log.info('[%s] Connected to {0} using sqlite {1}'.format(db_file, sqlite3.version), self.class_name)
-            return self.conn
+            if self.conn is not None:
+                self.log.info('[%s] Connection is already established', self.class_name)
+                return self.conn
 
-        except Error as e:
-            self.log.info(e)
+            try:
+                self.conn = sqlite3.connect(os.path.join(os.getcwd(), db_file))
+                self.log.info('[%s] Connected to {0} using sqlite {1}'.format(db_file, sqlite3.version), self.class_name)
+                return self.conn
+
+            except Exception as err:
+                self.log.exception(err)
+
+        except Exception as err:
+            self.log.exception(err)
 
     def close(self):
         '''
@@ -814,136 +1095,185 @@ class Database:
 
             Inputs: None
 
-            Output:
+            Output
                 Object of the closed connection
         '''
 
         self.log.info('[%s] Closing connection', self.class_name)
 
-        if self.conn:
-            self.conn.close()
+        try:
+            if self.conn:
+                self.conn.close()
+                self.conn = None
 
-        self.log.info('[%s] Connection closed', self.class_name)
+            self.log.info('[%s] Connection closed', self.class_name)
+
+        except Exception as err:
+            self.log.exception(err)
 
     def get_file(self, md5=None, sha256=None):
         '''
             Looks for any rows in the database with the provided hash
 
-            Inputs:
-                md5: MD5 hash to search for in the database (str)
-                sha256: SHA256 hash to search for in the database (str)
+            Inputs
+                md5 (str):      MD5 hash to search for in the database
+                sha256 (str):   SHA256 hash to search for in the database
 
-            Output:
+            Raises
+                TypeError if md5 is not a string
+                ValueError if md5 is not 32 characters long
+                TypeError if sha256 is not a string
+                ValueError if sha256 is not 64 characters long
+
+            Output
                 Returns any rows found matching the provided hash. If no results
                     were found, returns None
         '''
 
         if md5 is not None:
+            if isinstance(md5, str) == False:
+                raise TypeError('Expected md5 input type is string.')
+            if len(md5) != 32:
+                raise ValueError('Expected sha256 to be 64 characters long')
+
             item = md5
             item_type = 'md5'
+
         elif sha256 is not None:
+            if isinstance(sha256, str) == False:
+                raise TypeError('Expected sha256 input type is string.')
+            if len(sha256) != 64:
+                raise ValueError('Expected sha256 to be 64 characters long')
+
             item = sha256
             item_type = 'sha256'
+
         else:
             self.log.error('[%s] No hash provided', self.class_name)
-            return 'No hash provided'
+            raise Exception('No hash provided')
 
         self.log.info('[%s] Getting hash by {0}: {1}'.format(item_type, item), self.class_name)
-        sql = 'SELECT * FROM files WHERE {0} = ?'.format(item_type)
 
-        cursor = self.conn.cursor()
-        cursor.execute(sql, (item,))
-        rows = cursor.fetchall()
-        if len(rows) > 0:
-            self.log.info('[%s] Found {0}: {1}'.format(item_type, item), self.class_name)
-            return rows
+        try:
+            sql = 'SELECT * FROM files WHERE {0} = ?'.format(item_type)
 
-        self.log.info('[%s] Unable to find hash by {0}: {1}'.format(item_type, item), self.class_name)
-        return None
+            cursor = self.conn.cursor()
+            cursor.execute(sql, (item,))
+            rows = cursor.fetchall()
+            if len(rows) > 0:
+                self.log.info('[%s] Found {0}: {1}'.format(item_type, item), self.class_name)
+                return rows
+
+            self.log.info('[%s] Unable to find hash by {0}: {1}'.format(item_type, item), self.class_name)
+            return None
+
+        except Exception as err:
+            self.log.exception(err)
 
     def add_file(self, md5, sha256, status):
         '''
             Adds a file to the database
 
-            Inputs:
-                md5: MD5 hash to add to the row (str)
-                sha256: SHA256 hash to add to the row (str)
-                status: Status from Zscaler report (str)
+            Inputs
+                md5 (str):      MD5 hash to add to the row
+                sha256 (str):   SHA256 hash to add to the row
+                status (str):   Status from Zscaler report
 
-            Output:
-                Returns the row ID of the new entry
+            Raises
+                Exception if not connection exists
+                TypeError if md5 is not a string
+                ValueError if md5 is not 32 characters long
+                TypeError if sha256 is not a string
+                ValueError if sha256 is not 64 characters long
+                TypeError if status is not a string
+
+            Output
+                row_id (int):   Returns the row ID of the new entry
         '''
+
         if self.conn is None:
             raise Exception('No connection to database')
 
-        if md5 is None:
-            raise ValueError('Missing md5')
-        if sha256 is None:
-            raise ValueError('Missing sha256')
-        if status is None:
-            raise ValueError('Missing status')
-
         if isinstance(md5, str) == False:
-            raise ValueError('md5 must be a string')
+            raise TypeError('md5 must be a string')
+        if len(md5) != 32:
+            raise ValueError('md5 must be 32 characters long')
         if isinstance(sha256, str) == False:
-            raise ValueError('sha256 must be a string')
+            raise TypeError('sha256 must be a string')
+        if len(sha256) != 64:
+            raise ValueError('sha256 must be 64 characters long')
         if isinstance(status, str) == False:
-            raise ValueError('status must be a string')
+            raise TypeError('status must be a string')
 
         self.log.info('[%s] Adding file: MD5: {0}'.format(md5), self.class_name)
 
-        if self.get_file(md5=md5):
-            raise FileExistsError(f'File already exists: {md5}')
+        try:
+            if self.get_file(md5=md5):
+                raise FileExistsError(f'File already exists: {md5}')
 
-        timestamp = convert_time('now')
-        file_info = (timestamp, md5, sha256, status,)
-        sql = 'INSERT INTO files(timestamp,md5,sha256,status) VALUES(?,?,?,?)'
-        cur = self.conn.cursor()
-        cur.execute(sql, file_info)
-        self.conn.commit()
-        return cur.lastrowid
+            timestamp = convert_time('now')
+            file_info = (timestamp, md5, sha256, status,)
+            sql = 'INSERT INTO files(timestamp,md5,sha256,status) VALUES(?,?,?,?)'
+            cur = self.conn.cursor()
+            cur.execute(sql, file_info)
+            self.conn.commit()
+            return cur.lastrowid
+
+        except Exception as err:
+            self.log.exception(err)
 
     def update_file(self, md5, sha256, status):
         '''
             Update a file in the database
 
-            Inputs:
-                md5: MD5 hash to add to the row (str)
-                sha256: SHA256 hash to add to the row (str)
-                status: Status from Zscaler report (str)
+            Inputs
+                md5 (str):      MD5 hash to add to the row
+                sha256 (str):   SHA256 hash to add to the row
+                status (str):   Status from Zscaler report
 
-            Output:
-                Returns the results of the new row
+            Raises
+                Exception if not connection exists
+                TypeError if md5 is not a string
+                ValueError if md5 is not 32 characters long
+                TypeError if sha256 is not a string
+                ValueError if sha256 is not 64 characters long
+                TypeError if status is not a string
+                Exception if md5 doesn't exist in the database
+
+            Output
+                data (dict):    Returns the results of the new row
         '''
-        if md5 is None:
-            raise ValueError('Missing md5')
-        if sha256 is None:
-            raise ValueError('Missing sha256')
-        if status is None:
-            raise ValueError('Missing status')
+        if self.conn is None:
+            raise Exception('No connection to database')
 
         if isinstance(md5, str) == False:
-            raise ValueError('md5 must be a string')
+            raise TypeError('md5 must be a string')
+        if len(md5) != 32:
+            raise ValueError('md5 must be 32 characters long')
         if isinstance(sha256, str) == False:
-            raise ValueError('sha256 must be a string')
+            raise TypeError('sha256 must be a string')
+        if len(sha256) != 64:
+            raise ValueError('sha256 must be 64 characters long')
         if isinstance(status, str) == False:
-            raise ValueError('status must be a string')
+            raise TypeError('status must be a string')
 
         self.log.info('[%s] Updating file: {0}'.format(md5), self.class_name)
 
-        if self.conn is None:
-            raise Exception('No connection to database')
         if self.get_file(md5=md5) == None:
             raise Exception(f'Unable to add file. File doesn\'t exist: {md5}')
 
-        timestamp = convert_time('now')
-        params = (timestamp, status, md5,)
-        sql = 'UPDATE files(timestamp,status) SET timestamp = ?, status = ? WHERE md5 = ?'
-        cursor = self.conn.cursor()
-        cursor.execute(sql, params)
-        self.conn.commit()
+        try:
+            timestamp = convert_time('now')
+            params = (timestamp, status, md5,)
+            sql = 'UPDATE files(timestamp,status) SET timestamp = ?, status = ? WHERE md5 = ?'
+            cursor = self.conn.cursor()
+            cursor.execute(sql, params)
+            self.conn.commit()
 
-        return self.get_file(md5=md5)
+            return self.get_file(md5=md5)
+
+        except Exception as err:
+            self.log.exception(err)
 
     def last_pull(self, timestamp=None):
         '''
@@ -962,30 +1292,34 @@ class Database:
         if self.conn is None:
             raise Exception('No connection to database')
 
-        if timestamp is not None and isinstance(timestamp, str) == False:
-            raise Exception('Timestamp must be a string.')
+        try:
+            if timestamp is not None and isinstance(timestamp, (str, int)) == False:
+                raise Exception('Timestamp must be a string, integer, or None')
 
-        # Get or set last pull timestamp
-        if timestamp is None:
-            self.log.info('[%s] Getting last pull', self.class_name)
-            sql = 'SELECT timestamp FROM alerts WHERE id = 1'
-            cursor = self.conn.cursor()
-            cursor.execute(sql)
-            rows = cursor.fetchall()
-            return rows[0][0]
+            # Get or set last pull timestamp
+            if timestamp is None:
+                self.log.info('[%s] Getting last pull', self.class_name)
+                sql = 'SELECT timestamp FROM alerts WHERE id = 1'
+                cursor = self.conn.cursor()
+                cursor.execute(sql)
+                rows = cursor.fetchall()
+                return rows[0][0]
 
-        else:
-            if isinstance(timestamp, int):
-                timestamp = convert_time(timestamp)
+            else:
+                if isinstance(timestamp, int):
+                    timestamp = convert_time(timestamp)
 
-            self.log.info('[%s] Update last pull: {0}'.format(timestamp), self.class_name)
+                self.log.info('[%s] Update last pull: {0}'.format(timestamp), self.class_name)
 
-            timestamp = (timestamp,)
-            sql = 'UPDATE alerts SET timestamp = ? WHERE id = 1'
-            cursor = self.conn.cursor()
-            cursor.execute(sql, timestamp)
-            self.conn.commit()
-            return True
+                timestamp = (timestamp,)
+                sql = 'UPDATE alerts SET timestamp = ? WHERE id = 1'
+                cursor = self.conn.cursor()
+                cursor.execute(sql, timestamp)
+                self.conn.commit()
+                return True
+
+        except Exception as err:
+            self.log.exception(err)
 
 
 class Zscaler:
@@ -1005,23 +1339,27 @@ class Zscaler:
             Output
                 self
         '''
-        self.class_name = 'Zscaler'
-        self.log = log
-        self.log.info('[%s] Initializing', self.class_name)
+        try:
+            self.class_name = 'Zscaler'
+            self.log = log
+            self.log.info('[%s] Initializing', self.class_name)
 
-        self.url = config['Zscaler']['url']
-        self.api_key = config['Zscaler']['api_key']
-        self.username = config['Zscaler']['username']
-        self.password = config['Zscaler']['password']
-        self.session = None
-        self.quota = None
-        self.reports = {}
-        self.bad_types = config['Zscaler']['bad_types'].split(',')
-        self.headers = {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache',
-            'User-Agent': 'VMware Carbon Black Cloud Connector'
-        }
+            self.url = config['Zscaler']['url']
+            self.api_key = config['Zscaler']['api_key']
+            self.username = config['Zscaler']['username']
+            self.password = config['Zscaler']['password']
+            self.session = None
+            self.quota = None
+            self.reports = {}
+            self.bad_types = config['Zscaler']['bad_types'].split(',')
+            self.headers = {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache',
+                'User-Agent': 'VMware Carbon Black Cloud Connector'
+            }
+
+        except Exception as err:
+            self.log.exception(err)
 
     def _obfuscate_api_key(self):
         '''
@@ -1033,20 +1371,23 @@ class Zscaler:
             Output:
                 Returns current timestamp and obfuscated API key
         '''
+        try:
+            seed = self.api_key
+            now = int(time.time() * 1000)
+            n = str(now)[-6:]
+            r = str(int(n) >> 1).zfill(6)
+            key = ''
 
-        seed = self.api_key
-        now = int(time.time() * 1000)
-        n = str(now)[-6:]
-        r = str(int(n) >> 1).zfill(6)
-        key = ''
+            for i in range(0, len(str(n)), 1):
+                key += seed[int(str(n)[i])]
 
-        for i in range(0, len(str(n)), 1):
-            key += seed[int(str(n)[i])]
+            for j in range(0, len(str(r)), 1):
+                key += seed[int(str(r)[j]) + 2]
 
-        for j in range(0, len(str(r)), 1):
-            key += seed[int(str(r)[j]) + 2]
+            return now, key
 
-        return now, key
+        except Exception as err:
+            self.log.exception(err)
 
     def start_session(self):
         '''
@@ -1055,7 +1396,10 @@ class Zscaler:
 
             Inputs: None
 
-            Output:
+            Raises
+                Exception if response status_code is not 200
+
+            Output
                 Raw JSON response from the request
         '''
 
@@ -1094,10 +1438,14 @@ class Zscaler:
             Inputs
                 md5: MD5 hash to search for (str)
 
+            Raises
+                TypeError if md5 is not a string
+                ValueError if md5 is not 32 characters long
+
             Outputs (3 options)
-                None  - if Zscaler didn't return a report (hash not found)
-                False - if the Sandbox quota has been exceeded
-                report - the raw JSON from Zscaler if a report was found
+                None:           if Zscaler didn't return a report (hash not found)
+                False:          if the Sandbox quota has been exceeded
+                report (dict):  the raw JSON from Zscaler if a report was found
 
             > Note: there is a blocking 0.5 second delay to throttle requests to
                 Zscaler's sandbox (max 2 persecond)
@@ -1105,17 +1453,26 @@ class Zscaler:
 
         self.log.info('[%s] Checking file: {0}'.format(md5), self.class_name)
 
-        # Check to see if we already have this report
-        if md5 in self.reports:
-            return self.reports[md5]
+        if isinstance(md5, str) == False:
+            raise TypeError('Expected md5 to be a string')
+        if len(md5) != 32:
+            raise ValueError('Expected md5 to be a length of 32 characters')
 
-        if self.quota is None:
-            self.get_quota()
+        try:
+            # Check to see if we already have this report
+            if md5 in self.reports:
+                return self.reports[md5]
 
-        if self.quota['unused'] == 0:
-            self.log.warning('[%s] All queries for the day have been used. Max is {0}'.format(self.quota['allowed']),
-                          self.class_name)
-            return False
+            if self.quota is None:
+                self.get_quota()
+
+            if self.quota['unused'] == 0:
+                self.log.warning('[%s] All queries for the day have been used. Max is {0}'.format(self.quota['allowed']),
+                              self.class_name)
+                return False
+
+        except Exception as err:
+            self.log.exception(err)
 
         # Zscaler throttles to 2 requests per second
         sleep(0.5)
@@ -1155,9 +1512,8 @@ class Zscaler:
                 return zs_report
 
             else:
-                raise Exception(f'{s.status_code} {s.text}')
-                self.log.error('[%s] Error: Status Code: {0}'.format(r.status_code), self.class_name)
-                self.log.error(r.text)
+                self.log.exception('[%s] Error {0}: {1}'.format(r.status_code, r.text), self.class_name)
+                raise Exception(f'{r.status_code} {r.text}')
 
             self.reports[md5] = None
             return None
@@ -1171,21 +1527,25 @@ class Zscaler:
 
             Inputs: None
 
-            Output:
-                Raw JSON response of the request
+            Raises
+                Exception if response status_code is not 200
+                
+            Output
+                data (dict):    Raw JSON response of the request
         '''
 
         self.log.info('[%s] Getting qouota', self.class_name)
 
         if self.session is None:
             self.start_session()
+        
         try:
             # Get the report
             url = '{0}/api/v1/sandbox/report/quota'.format(self.url)
             headers = self.headers
             s = self.session
             r = s.get(url, headers=headers)
-    
+
             if r.status_code == 200:
                 data = r.json()[0]
                 self.quota = data
@@ -1194,7 +1554,7 @@ class Zscaler:
                                                                                      data['allowed']), self.class_name)
             else:
                 raise Exception(f'{s.status_code} {s.text}')
-                
+
         except Exception as err:
             self.log.exception(err)
 
@@ -1203,13 +1563,16 @@ def convert_time(timestamp):
     '''
         Converts epoch or ISO8601 formatted timestamp
 
-        Inputs:
+        Inputs
             timestamp
                 epoch time (int)
                 ISO8601 time (str)
                 'now' (str)
 
-        Output:
+        Raises
+            TypeError if timestamp is not a string or integer
+
+        Output
             If timestamp was epoch, returns ISO8601 version of timestamp
             If timestamp was ISO8601, returns epoch version of timestamp
             If timestamp was 'now', returns ISO8601 of current time
@@ -1217,21 +1580,27 @@ def convert_time(timestamp):
         > Note: All times are treated as GMT
     '''
 
-    if isinstance(timestamp, int):
-        if len(str(timestamp)) == 13:
-            timestamp = int(timestamp / 1000)
+    if isinstance(timestamp, (str, int)) == False:
+        raise TypeError('timestamp is expected to be an integer or string.')
 
-        utc_dt = datetime(1970, 1, 1) + timedelta(seconds=timestamp)
-        converted_time = utc_dt.strftime('%Y-%m-%dT%H:%M:%S.000Z')
+    try:
+        if isinstance(timestamp, int):
+            if len(str(timestamp)) == 13:
+                timestamp = int(timestamp / 1000)
 
-    else:
-        if timestamp == 'now':
-            return time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime())
-        utc_dt = datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%fZ')
-        converted_time = int((utc_dt - datetime(1970, 1, 1)).total_seconds())
+            utc_dt = datetime(1970, 1, 1) + timedelta(seconds=timestamp)
+            converted_time = utc_dt.strftime('%Y-%m-%dT%H:%M:%S.000Z')
 
-    return converted_time
+        else:
+            if timestamp == 'now':
+                return time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime())
+            utc_dt = datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%fZ')
+            converted_time = int((utc_dt - datetime(1970, 1, 1)).total_seconds())
 
+        return converted_time
+
+    except Exception as err:
+        self.log.exception(err)
 
 def str2bool(item):
     return item.lower() in ['true', '1']
