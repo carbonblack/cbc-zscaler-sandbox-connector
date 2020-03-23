@@ -296,6 +296,7 @@ def get_cbth_processes():
 
     return processes
 
+
 def main():
     # Get inits
     init()
@@ -312,13 +313,13 @@ def main():
 
     if cbd_enabled:
         # Get CBD events for the last 3h
-        events = cb.get_events(timespan='3h')
+        events = cb.get_events(timespan='3d')
 
         # Process events
         process_events(events)
 
 
-    # If watchlists were enabled in take_action() and there were bad files, update the watchlist
+    # If watchlists are enabled in take_action() and there were bad files, update the watchlist
     if cb.new_reports is not None and len(cb.new_reports):
         feed = cb.get_feed(feed_name=config['actions']['watchlist'])
         feed.append_reports(cb.new_reports)

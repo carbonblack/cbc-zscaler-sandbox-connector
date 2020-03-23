@@ -14,11 +14,11 @@ import requests
 
 
 # Import CBC Basics
-from cbapi.psc import CbPSCBaseAPI
+from cbapi.psc import CbPSCBaseAPI, Device
 from cbapi.psc.models import BaseAlert
 
 # Import Defense
-from cbapi.psc.defense import CbDefenseAPI
+from cbapi.psc.defense import CbDefenseAPI, Device
 from cbapi.psc.defense.models import Event, Device, Policy
 
 # Import ThreatHunter
@@ -97,7 +97,7 @@ class CarbonBlack:
             raise TypeError('Expected device_id input type is string.')
 
         try:
-            return self.cbd.select(Device, device_id)
+            return self.cb.select(Device, device_id)
 
         except Exception as err:
             self.log.exception(err)
