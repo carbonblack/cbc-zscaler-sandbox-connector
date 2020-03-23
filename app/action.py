@@ -40,34 +40,39 @@ def init():
 def main():
     cb, args = init()
 
-    '''
-        !!! check to see if process is still running
-    '''
+    device_id = int(args.device_id)
+    command = args.command
+    process_id = args.argument
 
-    lr_session = cb.start_session(int(args.device_id))
+    device = cb.get_device(device_id)
+    if 'LIVE_RESPONSE_ENABLED' not in device.original_document['sensorStates']:
+        log.error('[Main] Live Response not enabled on device {0}'.format(device_id))
+        return 1
 
-    # Check every 15 seconds for the status of the connection
-    while lr_session['status'] == 'PENDING':
-        sleep(15)
-        lr_session = cb.get_session()
+    lr_session = cb.start_session(device_id, wait=True)
 
-    print('[Main] Connected to endpoint: {0}'.format(args.device_id))
+    log.debug('[Main] Connected to endpoint: {0}'.format(device_id))
 
-    lr_command = cb.send_command(args.command, argument=args.argument)
+    # Check to see if the process is still running
+    lr_command = cb.send_command('process list', wait=True)
 
-    # Check every 5 seconds for the status of the command
-    while lr_command['status'] == 'pending':
-        sleep(5)
-        lr_command = cb.command_status(lr_command['id'])
+    for process in lr_command['processes']:
+        if str(process['pid']) == process_id:
 
-    if lr_command['status'] == 'BAD_REQUEST':
-        sys.exit(1)
+            # Send kill command
 
-    print('[Main] Command sent to endpoint')
+            lr_command = cb.send_command(command, argument=process_id, wait=True)
 
-    if args.close:
-        cb.close_session()
-        print('[Main] Closed session')
+            log.debug('[Main] Command sent to endpoint')
+
+            if args.close:
+                cb.close_session()
+                log.debug('[Main] Closed session')
+
+            return 0
+
+    log.warning('[Main] Process {0} was not running on device {1}'.format(process_id, device_id))
+    return 1
 
 
 if __name__ == "__main__":

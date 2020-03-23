@@ -79,31 +79,6 @@ class CarbonBlack:
     #
     # CBC Platform
     #
-    def get_alerts(self):
-        '''
-            Pull alerts from the Platform API using CBAPI.
-
-            Inputs:
-                None
-
-            Output:
-                A list of alert objects
-        '''
-
-        self.log.info('[%s] Getting alerts', self.class_name)
-        try:
-            query = self.cb.select(BaseAlert)
-            query = query.set_group_results(True)
-            query = query.set_minimum_severity(self.minimum_severity)
-            query = query.sort_by('first_event_time', 'DESC')
-            alerts = list(query)
-
-            self.log.info('[%s] Found {0} alerts'.format(len(alerts)), self.class_name)
-            return alerts
-
-        except Exception as err:
-            self.log.exception(err)
-
     def get_device(self, device_id):
         '''
             Get a specific device's details.
@@ -122,7 +97,7 @@ class CarbonBlack:
             raise TypeError('Expected device_id input type is string.')
 
         try:
-            return self.cb.select(Device, device_id)
+            return self.cbd.select(Device, device_id)
 
         except Exception as err:
             self.log.exception(err)
@@ -175,7 +150,7 @@ class CarbonBlack:
             raise TypeError('Expected policy_name input type is string.')
 
         try:
-            device = self.get_device(device_id)
+            device = self.cbd.select(Device, device_id)
             policies = self.cbd.select(Policy)
             for policy in policies:
                 if policy.name == policy_name:
@@ -257,10 +232,11 @@ class CarbonBlack:
                 data = r.json()
                 for event in data['results']:
                     reputation_filter = self.config['CarbonBlack']['reputation_filter'].split(',')
-                    effective_reputation = event['selectedApp']['effectiveReputation']
+                    reputation = event['selectedApp']['effectiveReputation']
+                    # reputation = event['selectedApp']['reputationProperty']
 
                     # Skip events that are not in the reputation_filter
-                    if reputation_filter is not None and effective_reputation not in reputation_filter:
+                    if reputation_filter is not None and reputation not in reputation_filter:
                         continue
 
                     # Update root with things that might be required later
@@ -295,7 +271,7 @@ class CarbonBlack:
             Grab a single event's details from CB Defense.
 
             Inputs
-                event_id (int): the ID of the event to be pulled
+                event_id (str): the ID of the event to be pulled
 
             Raises
                 TypeError if event_id is not an integer
@@ -307,7 +283,7 @@ class CarbonBlack:
 
         self.log.info('[%s] Getting event details: {0}'.format(event_id), self.class_name)
 
-        if isinstance(event_id, int) == False:
+        if isinstance(event_id, str) == False:
             raise TypeError('Expected event_id input type is integer.')
 
         try:
@@ -328,36 +304,6 @@ class CarbonBlack:
         except Exception as err:
             self.log.exception(err)
 
-    def get_events_by_sha256(self, sha256):
-        '''
-            Get all events related to a SHA256 hash.
-
-            Inputs
-                sha256 (str):   Hash for which to filter events
-
-            Raises
-                TypeError if sha256 is not a string
-                ValueError if sha256 is not 64 characters long
-
-            Output
-                A list of event objects
-        '''
-
-        self.log.info('[%s] Getting events by SHA256: {0}'.format(sha256), self.class_name)
-
-        if isinstance(sha256, str) == False:
-            raise TypeError('Expected sha256 input type is string.')
-        if len(sha256) != 64:
-            raise ValueError('Expected sha256 to be 64 characters long')
-
-        try:
-            events = list(self.cbd.select(Event).where('sha256Hash:{0}'.format(sha256)))
-
-            self.log.info('[%s] Found {0} events with sha256 {1}'.format(len(events), sha256))
-            return events
-
-        except Exception as err:
-            self.log.exception(err)
 
     #
     # CBC Enterprise EDR
@@ -439,7 +385,6 @@ class CarbonBlack:
                 raw_proc = process.original_document
                 raw_proc['type'] = 'cbth'
                 raw_proc['pid'] = raw_proc['process_pid'][0]
-                # print(json.dumps(raw_proc))
 
                 # Sometimes we don't have a hash. Skip these
                 if 'process_hash' not in raw_proc:
@@ -583,8 +528,8 @@ class CarbonBlack:
                 pulls based on that id.
 
             Inputs
-                feed_id (int):      ID of the feed to pull (int)
-                feed_name (str):    Name of the feed to pull (str)
+                feed_id (str):      ID of the feed to pull
+                feed_name (str):    Name of the feed to pull
 
             Raises
                 TypeError when feed_id is not an integer
@@ -599,9 +544,9 @@ class CarbonBlack:
 
         self.log.info('[%s] Getting feed: {0}'.format(feed_id), self.class_name)
 
-        if isinstance(feed_id, int) == False:
-            raise TypeError('Expected feed_id input type is integer.')
-        if isinstance(feed_name, str) == False:
+        if isinstance(feed_id, str) == False and feed_id is not None:
+            raise TypeError('Expected feed_id input type is string.')
+        if isinstance(feed_name, str) == False and feed_name is not None:
             raise TypeError('Expected feed_name input type is string.')
 
         if feed_id is None and feed_name is None:
@@ -627,8 +572,16 @@ class CarbonBlack:
                 return None
 
             feed = self.cbth.select(Feed, feed_id)
-            self.log.info('[%s] {0}'.format(feed), self.class_name)
+            self.feed = feed
 
+            # Build a cache of the existing IOCs in the feed
+            # This is used for deduplication when IOCs are added
+            for report in feed.reports:
+                for ioc in report.iocs_v2:
+                    for value in ioc['values']:
+                        self.iocs.append(value)
+
+            self.log.info('[%s] {0}'.format(feed), self.class_name)
             return feed
 
         except Exception as err:
@@ -677,6 +630,7 @@ class CarbonBlack:
             feed = self.cbth.create(Feed, feed)
             feed.save()
 
+            self.feed = feed
             return feed
 
         except Exception as err:
@@ -715,8 +669,8 @@ class CarbonBlack:
             raise TypeError('Expected title input type is string.')
         if isinstance(description, str) == False:
             raise TypeError('Expected description input type is string.')
-        if isinstance(severity, str) == False:
-            raise TypeError('Expected severity input type is string.')
+        if isinstance(severity, int) == False:
+            raise TypeError('Expected severity input type is integer.')
         if isinstance(link, str) == False:
             raise TypeError('Expected link input type is string.')
         if isinstance(tags, list) == False:
@@ -727,6 +681,11 @@ class CarbonBlack:
             raise ValueError('Expected md5 to be 32 characters long')
 
         self.log.info('[%s] Creating new Report:', self.class_name)
+
+        # If a report already exists, we will need to update the report
+        update = None
+        if md5 in self.iocs:
+            update = self.iocs.index(md5)
 
         try:
             report = {
@@ -743,6 +702,15 @@ class CarbonBlack:
             }
 
             report = self.cbth.create(Report, report)
+
+            # !!! need to figure out how to remove a report or update one
+            # if update is None:
+
+            # Keep track of reports for batch submission
+            self.new_reports.append(report)
+            # Keep track of IOCs for deduplication
+            self.iocs.append(md5)
+
 
             self.log.info('[%s] Created report', self.class_name)
             self.log.info(report)
@@ -761,7 +729,7 @@ class CarbonBlack:
 
             Inputs
                 device_id (int):    ID of the device to start the session on
-                wait (bool):        Hold the HTTP request while waiting for the session to establish
+                wait (bool):        Overrides default wait action. Checks get_session() every 15 seconds if True
 
             Raises
                 TypeError when device_id is not an integer
@@ -769,7 +737,8 @@ class CarbonBlack:
                 Exception when response status_code is anything other than 200
 
             Output
-                data (dict):    Raw JSON of the response. Contains the session_id for use later
+                data (dict):    Raw JSON of get_session() response if wait is True
+                data (dict):    Raw JSON of request to start session if wait is False
         '''
 
         if isinstance(device_id, int) == False:
@@ -780,12 +749,11 @@ class CarbonBlack:
         try:
             self.log.info('[%s] Starting LR session', self.class_name)
             url = '{0}/integrationServices/v3/cblr/session/{1}'.format(self.url, device_id)
-            params = { 'wait': wait }
             headers = {
                 'Content-Type': 'application/json',
                 'X-Auth-Token': '{0}/{1}'.format(self.lr_api_key, self.lr_api_id)
             }
-            r = requests.post(url, params=params, headers=headers)
+            r = requests.post(url, headers=headers)
 
             if r.status_code == 200:
                 data = r.json()
@@ -795,6 +763,13 @@ class CarbonBlack:
                 self.supported_commands = data['supported_commands']
 
                 self.log.info(json.dumps(data, indent=4))
+
+                if wait:
+                    while data['status'] == 'PENDING':
+                        sleep(15)
+                        data = self.get_session()
+                        print(json.dumps(data, indent=4))
+
                 return data
 
             else:
@@ -845,25 +820,28 @@ class CarbonBlack:
         except Exception as err:
             self.log.exception(err)
 
-    def send_command(self, command, argument=None):
+    def send_command(self, command, argument=None, wait=False):
         '''
             Sends a LiveResponse command to an endpoint
 
             Inputs
                 command (str):      Command to execute
                 arguments (str):    Supporting arguments for the command
+                wait (bool):        If True, wait until command is finished and return result
+                                    If False, send response from request
 
             Raises
                 TypeError if command is not a string
                 TypeError if argument is not a string or None
 
             Outputs
-                data (dict): Raw JSON from the request
+                data (dict): Raw JSON from command_status(data[id]) if wait is True
+                data (dict): Raw JSON from response to request if wait is False
         '''
 
         if isinstance(command, str) == False:
             raise TypeError('Expected command input type is string.')
-        if argument is not None or isinstance(argument, str) == False:
+        if argument is not None and isinstance(argument, str) == False:
             raise TypeError('Expected argument input type is string or None.')
 
         self.log.info('[%s] Sending command to LR session: {0}'.format(command), self.class_name)
@@ -896,6 +874,13 @@ class CarbonBlack:
                 data = r.json()
 
                 self.log.info(json.dumps(data, indent=4))
+
+                if wait:
+                    sleep(1)
+                    lr_command = self.command_status(data['id'])
+                    while data['status'] == 'pending':
+                        sleep(5)
+                        data = self.command_status(data['id'])
 
                 return data
 
@@ -1241,7 +1226,7 @@ class Database:
                 Exception if md5 doesn't exist in the database
 
             Output
-                data (dict):    Returns the results of the new row
+                data (list):    Returns the results of the new row
         '''
         if self.conn is None:
             raise Exception('No connection to database')
@@ -1262,10 +1247,11 @@ class Database:
         if self.get_file(md5=md5) == None:
             raise Exception(f'Unable to add file. File doesn\'t exist: {md5}')
 
+        timestamp = convert_time('now')
+        params = (timestamp, status, md5,)
+        sql = 'UPDATE files SET timestamp = ?, status = ? WHERE md5 = ?'
+
         try:
-            timestamp = convert_time('now')
-            params = (timestamp, status, md5,)
-            sql = 'UPDATE files(timestamp,status) SET timestamp = ?, status = ? WHERE md5 = ?'
             cursor = self.conn.cursor()
             cursor.execute(sql, params)
             self.conn.commit()
@@ -1498,7 +1484,6 @@ class Zscaler:
 
                 # If there was a report, return it
                 if zs_report is not None:
-                    print(zs_report)
                     zs_type = zs_report['Classification']['Type']
                     self.log.info('[%s] Sandbox report Classification Type: {0}'.format(zs_type), self.class_name)
 
@@ -1529,7 +1514,7 @@ class Zscaler:
 
             Raises
                 Exception if response status_code is not 200
-                
+
             Output
                 data (dict):    Raw JSON response of the request
         '''
@@ -1538,7 +1523,7 @@ class Zscaler:
 
         if self.session is None:
             self.start_session()
-        
+
         try:
             # Get the report
             url = '{0}/api/v1/sandbox/report/quota'.format(self.url)
@@ -1552,6 +1537,9 @@ class Zscaler:
                 self.log.info('[%s] Quota used: {0} unused: {1} allowed: {2}'.format(data['used'],
                                                                                      data['unused'],
                                                                                      data['allowed']), self.class_name)
+
+                return data
+
             else:
                 raise Exception(f'{s.status_code} {s.text}')
 
@@ -1604,3 +1592,6 @@ def convert_time(timestamp):
 
 def str2bool(item):
     return item.lower() in ['true', '1']
+
+''' Used to track action script executions '''
+script_queue = {}
