@@ -16,30 +16,38 @@ cb = CarbonBlack(config, log)
 zs = Zscaler(config, log)
 
 # Test helpers.CarbonBlack methods
+@pytest.mark.carbonblack
 def test_get_device():
     # should return an object of a device
     assert isinstance(cb.get_device(DEVICE_ID), object) == True
 
+@pytest.mark.carbonblack
 def test_get_events():
     assert isinstance(cb.get_events(rows=100), list) == True
 
+@pytest.mark.carbonblack
 def test_get_event():
     assert isinstance(cb.get_event(EVENT_ID), object) == True
 
+@pytest.mark.carbonblack
 def test_get_available_span():
     assert isinstance(cb.get_available_span(), dict)
 
+@pytest.mark.carbonblack
 def test_get_processes():
     query = 'process_start_time:[2020-03-01T11:00:00.000Z TO 2020-03-02T12:00:00.000Z]'
     unique = False
     assert isinstance(cb.get_processes(query, db, unique), list)
 
+@pytest.mark.carbonblack
 def test_get_metadata():
     assert isinstance(cb.get_metadata(SAMPLE_SHA256), dict)
 
+@pytest.mark.carbonblack
 def test_get_all_feeds():
     assert isinstance(cb.get_all_feeds(), object)
 
+@pytest.mark.carbonblack
 def test_get_feed():
     # test successful request by feed_id
     assert isinstance(cb.get_feed(feed_id=FEED_ID), object) == True
@@ -61,9 +69,11 @@ def test_get_feed():
     #test both feed_id and feed_name provided
     # assert cb.get_feed(feed_id=FEED_ID, feed_name=FEED_NAME) == False
 
+@pytest.mark.carbonblack
 def test_create_feed():
     assert isinstance(cb.create_feed(FEED_NAME, FEED_URL, FEED_SUMMARY), object) == True
 
+@pytest.mark.carbonblack
 def test_create_report():
     REPORT = cb.create_report(TIMESTAMP, REPORT_TITLE, REPORT_DESCRIPTION, REPORT_SEVERITY,
                                        REPORT_LINK, REPORT_TAGS, SAMPLE_MD5)
@@ -74,6 +84,7 @@ def test_create_report():
     # FEED = cb.get_feed(feed_name=FEED_NAME)
     # FEED.append_reports(cb.new_reports)
 
+@pytest.mark.carbonblack
 def test_start_session():
     LR_SESSION = cb.start_session(DEVICE_ID)
     assert isinstance(LR_SESSION, dict) == True
@@ -102,36 +113,45 @@ def test_start_session():
     assert isinstance(cb.close_session(), dict) == True
 
 # Test helper.Database methods
+@pytest.mark.database
 def test_connect():
     assert isinstance(db.connect(DATABASE_FILE), object) == True
 
+@pytest.mark.database
 def test_add_file():
     RESULT = db.add_file(RANDOM_MD5, RANDOM_SHA256, 'TESTING')
     print(type(RESULT))
     assert isinstance(RESULT, int) == True
 
+@pytest.mark.database
 def test_get_file():
     # Test file that is in database
     assert isinstance(db.get_file(md5=RANDOM_MD5), list) == True
 
+@pytest.mark.database
 def test_update_file():
     assert isinstance(db.update_file(RANDOM_MD5, RANDOM_SHA256, 'TEST_UPDATE'), list) == True
 
+@pytest.mark.database
 def test_last_pull():
     assert isinstance(db.last_pull(), str) == True
     assert db.last_pull(timestamp=convert_time('now')) == True
 
+@pytest.mark.database
 def test_close():
     assert isinstance(db.close(), object) == True
 
 
 # Test helper.Zscaler methods
+@pytest.mark.zscaler
 def test_start_session():
     assert isinstance(zs.start_session(), object) == True
 
+@pytest.mark.zscaler
 def test_get_report():
     assert isinstance(zs.get_report(SAMPLE_MD5), dict) == True
 
+@pytest.mark.zscaler
 def test_get_quota():
     assert isinstance(zs.get_quota(), dict) == True
 
