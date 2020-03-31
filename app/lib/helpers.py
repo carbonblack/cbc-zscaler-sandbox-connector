@@ -684,6 +684,8 @@ class CarbonBlack:
 
         # If a report already exists, we will need to update the report
         update = None
+        if self.iocs is None:
+            self.iocs = []
         if md5 in self.iocs:
             update = self.iocs.index(md5)
 
