@@ -33,32 +33,38 @@ Edit the `config.conf` file and update with your configurations
 
 All of the configurable settings for the integration can be found in `config.conf`.
 
-Here is a [link](https://github.com/carbonblack/cbc-zscaler-sandbox-connector/blob/master/sample/config.conf) to a sample config file with dummy creds. Below is a table explaining each section and option in the config file.
+| CarbonBlack         | Configure Carbon Black Cloud       |
+|:--------------------|:-----------------------------------|
+| `url`               | URL of CBC instance                |
+| `org_key`           | Org Key                            |
+| `api_id`            | API ID                             |
+| `api_key`           | API Secret Secret Key              |
+| `custom_api_id`     | Custom API ID                      |
+| `custom_api_key`    | Custom API Secret Key              |
+| `lr_api_id`         | LiveResponse API ID                |
+| `lr_api_key`        | LiveResponse API Secret Key        |
+| `cbd_enabled`       | Enable CBC Endpoint Standard?      |
+| `cbth_enabled`      | Enable CBC Enterprise EDR?         |
+| `filters`           | What reputation types to filter on |
+| `cbd_timespan`      | How far back to pull CB Defense events? Options are: `3h`, `1d`, `1w`, `2w`,`1m`, `all` |
+| `reputation_filter` | Filter CB ThreatHunter processes by reputation. Default is `NOT_LISTED` |
 
-| CarbonBlack      | Configure Carbon Black Cloud       |
-|:-----------------|:-----------------------------------|
-| `url`            | URL of CBC instance                |
-| `api_id`         | API ID                             |
-| `api_key`        | API Secret Secret Key              |
-| `custom_api_id`  | Custom API ID                      |
-| `custom_api_key` | Custom API Secret Key              |
-| `lr_api_id`      | LiveResponse API ID                |
-| `lr_api_key`     | LiveResponse API Secret Key        |
-| `org_key`        | Org Key                            |
-| `filters`        | What reputation types to filter on |
-| `cbd_enabled`    | Enable CBC Endpoint Standard?      |
-| `cbth_enabled`   | Enable CBC Enterprise EDR?         |
-| **Zscaler**      | **Configure Zscaler ZIA Access**   |
-| `url`            | URL for Zscaler ZIA                |
-| `api_key`        | API Key                            |
-| `username`       | Login Username                     |
-| `password`       | Login Password                     |
-| `bad_types`      | Bad Types in Sandbox Reports       |
-| **sqlite3**      | **Configure sqlite3**              |
-| `filename`       | Filename of the sqlite3 database   |
-| **actions**      | **Configure Actions**              |
-| `watchlist`      | Name of watchlist to populate      |
-| `webhook`        | URL to `POST` a JSON object of the event and sandbox report |
-| `script`         | A script to execute                |
-| `isolate`        | Isolate the endpoint?              |
-| `policy`         | Policy to move offending devices   |
+| **Zscaler**         | **Configure Zscaler ZIA Access**   |
+|:--------------------|:-----------------------------------|
+| `url`               | URL for Zscaler ZIA                |
+| `api_key`           | API Key                            |
+| `username`          | Login Username                     |
+| `password`          | Login Password                     |
+| `bad_types`         | Bad Types in Sandbox Reports. Default is `MALICOUS,SUSPICIOUS`      |
+
+| **sqlite3**         | **Configure sqlite3**              |
+|:--------------------|:-----------------------------------|
+| `filename`          | Filename of the sqlite3 database   |
+
+| **actions**         | **Configure Actions**              |
+|:--------------------|:-----------------------------------|
+| `watchlist`         | Name of watchlist to populate      |
+| `webhook`           | URL to `POST` a JSON object of the event and sandbox report |
+| `script`            | A script to execute                |
+| `isolate`           | Isolate the endpoint?              |
+| `policy`            | Policy to move offending devices   |
