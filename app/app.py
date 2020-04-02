@@ -313,7 +313,8 @@ def main():
 
     if cbd_enabled:
         # Get CBD events for the last 3h
-        events = cb.get_events(timespan='3d')
+        timespan = config['CarbonBlack']['cbd_timespan']
+        events = cb.get_events(timespan=timespan)
 
         # Process events
         process_events(events)
