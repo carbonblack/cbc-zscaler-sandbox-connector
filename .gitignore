@@ -8,9 +8,16 @@ __pycache__/
 
 # Pyenv files
 .python-version
+.DS_Store
+
 
 # Integration specific
 */config.conf
 app/*.sql
 app/app.log
 todo.txt
+database.sql
+app.log
+app/config.conf
+codeship.aes
+env

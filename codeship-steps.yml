@@ -1,0 +1,6 @@
+- name: linters
+  service: testing
+  command: bin/linter.sh
+- name: tests
+  service: testing
+  command: bin/run_tests.sh
