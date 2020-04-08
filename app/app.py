@@ -26,7 +26,7 @@ def init():
         Inputs: None
 
         Outputs:
-            config: A dictionary of the settings loaded from config.ini
+            config: A dictionary of the settings loaded from config.conf
             db: An object with everything needed for this script to work with sqlite3
             cb: An object with everything needed for this script to work with CarbonBlack Cloud
             zs: An object with everything needed for this script to work with Zscaler ZIA Sandbox
@@ -313,7 +313,8 @@ def main():
 
     if cbd_enabled:
         # Get CBD events for the last 3h
-        events = cb.get_events(timespan='3d')
+        timespan = config['CarbonBlack']['cbd_timespan']
+        events = cb.get_events(timespan=timespan)
 
         # Process events
         process_events(events)

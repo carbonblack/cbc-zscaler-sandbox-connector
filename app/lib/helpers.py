@@ -196,8 +196,13 @@ class CarbonBlack:
 
         self.log.info('[%s] Getting events for the last {0}'.format(timespan), self.class_name)
 
+        available_timespans = ['3h', '1d', '1w', '2w', '1m', 'all']
+
         if isinstance(timespan, str) == False:
             raise TypeError('Expected timespan input type is string.')
+        if timespan not in available_timespans:
+            err_msg = ', '.join(available_timespans)
+            raise ValueError('Invalid timespan. Available options are: {}'.format(err_msg))
         if isinstance(rows, int) == False:
             raise TypeError('Expected rows input type is integer.')
         if isinstance(start, int) == False:
