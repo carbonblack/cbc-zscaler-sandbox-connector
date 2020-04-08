@@ -1,3 +1,8 @@
 requests
 cbapi
-sqlite3
+
+# Dev dependencies
+flake8
+flake8-docstrings
+coverage
+pytest
