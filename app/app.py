@@ -10,7 +10,7 @@ import requests
 from datetime import datetime
 
 # Import helpers
-from lib.helpers import *
+from lib.helpers import CarbonBlack, Database, Zscaler, convert_time, str2bool, script_queue
 
 # Globals
 config = None
@@ -39,7 +39,8 @@ def init():
     config.read('config.conf')
 
     # Configure logging
-    log.basicConfig(filename=config['logging']['filename'], format='[%(asctime)s] <pid:%(process)d> %(message)s', level=log.DEBUG)
+    log.basicConfig(filename=config['logging']['filename'], format='[%(asctime)s] <pid:%(process)d> %(message)s',
+                    level=log.DEBUG)
     log.info('[APP.PY] Sarted Zscaler ZIA Sandbox Connector for VMware Carbon Black Cloud')
 
     # Configure CLI input arguments
@@ -48,7 +49,6 @@ def init():
     parser.add_argument('--cbd', action='store_true', default=False, help='Pull CBD events')
     parser.add_argument('--cbth', action='store_true', default=False, help='Pull CBTH processes')
     args = parser.parse_args()
-
 
     log.debug(args.cbd)
     if args.cbd or args.cbth:
@@ -103,10 +103,17 @@ def take_action(cb_event, zs_report):
         # Build the Report arguments
         timestamp = convert_time(convert_time('now'))
         title = '{} - {} - {}'.format(md5, Type, Category)
-        description = '''Status: {} # Category: {} # FileType: {} # StartTime: {} # Duration: {} # Type: {} \
-    #  Category: {} # Score: {} # DetectedMalware: {}'''.format(Status, Category, FileType,
-                                                            StartTime, Duration, Type,
-                                                            Category, Score, DetectedMalware)
+        description = ' # '.join([
+            'Status: {}',
+            'Category: {}',
+            'FileType: {}',
+            'StartTime: {}',
+            'Duration: {}',
+            'Type: {}',
+            'Category: {}',
+            'Score: {}',
+            'DetectedMalware: {}'
+        ]).format(Status, Category, FileType, StartTime, Duration, Type, Category, Score, DetectedMalware)
 
         severity = int(int(Score) / 10)
         if severity == 0:
@@ -120,20 +127,20 @@ def take_action(cb_event, zs_report):
             cb.iocs = []
 
         # If the feed has already been pulled, it is cached in cb.feed
-        if cb.feed == None:
+        if cb.feed is None:
             # Get the feed
             feed = cb.get_feed(feed_name=actions['watchlist'])
 
             # If the feed doesn't exist, create it
-            if feed == None:
+            if feed is None:
                 summary = 'MD5 indicators that tested positive in Zscaler Sandbox for one of \
-                          the following: {0}'.format(config['Zscaler']['bad_types'])
+                           the following: {0}'.format(config['Zscaler']['bad_types'])
                 feed = cb.create_feed(actions['watchlist'], config['Zscaler']['url'], summary)
 
         # If IOC is not tracked in watchlist, add it
         if md5 not in cb.iocs:
             # Build the Report. cb.create_report caches the new reports in cb.new_reports
-            report = cb.create_report(timestamp, title, description, severity, url, tags, md5)
+            cb.create_report(timestamp, title, description, severity, url, tags, md5)
 
     # Send data to webhook
     if 'webhook' in actions and actions['webhook'] is not None:
@@ -272,7 +279,7 @@ def get_cbth_processes():
     # Get the start and end times
     # Start time comes from the datbase's last_pull time
     last_pull = convert_time(db.last_pull())
-    buffer_time = 30 * 60 # 30 minutes
+    buffer_time = 30 * 60  # 30 minutes
     start_time = convert_time(last_pull - buffer_time)
 
     # End time is the 'upper' of available span
@@ -318,7 +325,6 @@ def main():
 
         # Process events
         process_events(events)
-
 
     # If watchlists are enabled in take_action() and there were bad files, update the watchlist
     if cb.new_reports is not None and len(cb.new_reports):

@@ -1,9 +1,7 @@
 import os
-import sys
 import json
 
 import sqlite3
-from sqlite3 import Error
 
 import uuid
 import time
@@ -14,12 +12,11 @@ import requests
 
 
 # Import CBC Basics
-from cbapi.psc import CbPSCBaseAPI, Device
-from cbapi.psc.models import BaseAlert
+from cbapi.psc import CbPSCBaseAPI
 
 # Import Defense
-from cbapi.psc.defense import CbDefenseAPI, Device
-from cbapi.psc.defense.models import Event, Device, Policy
+from cbapi.psc.defense import CbDefenseAPI
+from cbapi.psc.defense.models import Device, Policy
 
 # Import ThreatHunter
 from cbapi.psc.threathunter import CbThreatHunterAPI
@@ -93,7 +90,7 @@ class CarbonBlack:
                 An object of the device
         '''
 
-        if isinstance(device_id, int) == False:
+        if isinstance(device_id, int) is False:
             raise TypeError('Expected device_id input type is string.')
 
         try:
@@ -116,7 +113,7 @@ class CarbonBlack:
                 An object of the device
         '''
 
-        if isinstance(device_id, int) == False:
+        if isinstance(device_id, int) is False:
             raise TypeError('Expected device_id input type is string.')
 
         try:
@@ -144,9 +141,9 @@ class CarbonBlack:
                 An object of the device
         '''
 
-        if isinstance(device_id, int) == False:
+        if isinstance(device_id, int) is False:
             raise TypeError('Expected device_id input type is integer.')
-        if isinstance(policy_name, str) == False:
+        if isinstance(policy_name, str) is False:
             raise TypeError('Expected policy_name input type is string.')
 
         try:
@@ -163,10 +160,10 @@ class CarbonBlack:
         except Exception as err:
             self.log.exception(err)
 
-
     #
     # CBC Endpoint Standard
     #
+
     def get_events(self, timespan='3h', rows=2500, start=0, unique=False):
         '''
             Get all events within the provided timespan.
@@ -198,16 +195,16 @@ class CarbonBlack:
 
         available_timespans = ['3h', '1d', '1w', '2w', '1m', 'all']
 
-        if isinstance(timespan, str) == False:
+        if isinstance(timespan, str) is False:
             raise TypeError('Expected timespan input type is string.')
         if timespan not in available_timespans:
             err_msg = ', '.join(available_timespans)
             raise ValueError('Invalid timespan. Available options are: {}'.format(err_msg))
-        if isinstance(rows, int) == False:
+        if isinstance(rows, int) is False:
             raise TypeError('Expected rows input type is integer.')
-        if isinstance(start, int) == False:
+        if isinstance(start, int) is False:
             raise TypeError('Expected start input type is integer.')
-        if isinstance(unique, bool) == False:
+        if isinstance(unique, bool) is False:
             raise TypeError('Expected unique input type is boolean.')
 
         try:
@@ -288,7 +285,7 @@ class CarbonBlack:
 
         self.log.info('[%s] Getting event details: {0}'.format(event_id), self.class_name)
 
-        if isinstance(event_id, str) == False:
+        if isinstance(event_id, str) is False:
             raise TypeError('Expected event_id input type is integer.')
 
         try:
@@ -309,10 +306,10 @@ class CarbonBlack:
         except Exception as err:
             self.log.exception(err)
 
-
     #
     # CBC Enterprise EDR
     #
+
     def get_available_span(self):
         '''
             Gets the available data timeframes in CBC.
@@ -367,19 +364,17 @@ class CarbonBlack:
                 Returns a list of processes (list of dicts)
         '''
 
-
-        if isinstance(query, str) == False:
+        if isinstance(query, str) is False:
             raise TypeError('Expected query input type is string.')
-        if isinstance(db, object) == False:
+        if isinstance(db, object) is False:
             raise TypeError('Expected db input type is object.')
-        if isinstance(unique, bool) == False:
+        if isinstance(unique, bool) is False:
             raise TypeError('Expected unique input type is boolean.')
 
         self.log.info('[%s] Getting processes: "{0}"'.format(query), self.class_name)
 
         try:
             all_procs = []
-            proc_tracker = []
             unique_procs = []
             hash_tracker = {}
 
@@ -409,7 +404,7 @@ class CarbonBlack:
 
                         # Otherwise fill with 0's
                         else:
-                            raw_proc['sha256'] = '0'*64
+                            raw_proc['sha256'] = '0' * 64
 
                     # If we only have the sha256
                     else:
@@ -480,7 +475,7 @@ class CarbonBlack:
 
         self.log.info('[%s] Getting file metadata: {0}'.format(sha256), self.class_name)
 
-        if isinstance(sha256, str) == False:
+        if isinstance(sha256, str) is False:
             raise TypeError('Expected sha256 input type is string.')
         if len(sha256) != 64:
             raise ValueError('Expected sha256 to be 64 characters long')
@@ -549,9 +544,9 @@ class CarbonBlack:
 
         self.log.info('[%s] Getting feed: {0}'.format(feed_id), self.class_name)
 
-        if isinstance(feed_id, str) == False and feed_id is not None:
+        if isinstance(feed_id, str) is False and feed_id is not None:
             raise TypeError('Expected feed_id input type is string.')
-        if isinstance(feed_name, str) == False and feed_name is not None:
+        if isinstance(feed_name, str) is False and feed_name is not None:
             raise TypeError('Expected feed_name input type is string.')
 
         if feed_id is None and feed_name is None:
@@ -610,11 +605,11 @@ class CarbonBlack:
                 An object of the newly created feed
         '''
 
-        if isinstance(name, str) == False:
+        if isinstance(name, str) is False:
             raise TypeError('Expected name input type is string.')
-        if isinstance(url, str) == False:
+        if isinstance(url, str) is False:
             raise TypeError('Expected url input type is string.')
-        if isinstance(summary, str) == False:
+        if isinstance(summary, str) is False:
             raise TypeError('Expected summary input type is string.')
 
         try:
@@ -668,31 +663,27 @@ class CarbonBlack:
                 An object of the newly created report
         '''
 
-        if isinstance(timestamp, int) == False:
+        if isinstance(timestamp, int) is False:
             raise TypeError('Expected timestamp input type is integer.')
-        if isinstance(title, str) == False:
+        if isinstance(title, str) is False:
             raise TypeError('Expected title input type is string.')
-        if isinstance(description, str) == False:
+        if isinstance(description, str) is False:
             raise TypeError('Expected description input type is string.')
-        if isinstance(severity, int) == False:
+        if isinstance(severity, int) is False:
             raise TypeError('Expected severity input type is integer.')
-        if isinstance(link, str) == False:
+        if isinstance(link, str) is False:
             raise TypeError('Expected link input type is string.')
-        if isinstance(tags, list) == False:
+        if isinstance(tags, list) is False:
             raise TypeError('Expected tags input type is a list of strings.')
-        if isinstance(md5, str) == False:
+        if isinstance(md5, str) is False:
             raise TypeError('Expected md5 input type is string.')
         if len(md5) != 32:
             raise ValueError('Expected md5 to be 32 characters long')
 
         self.log.info('[%s] Creating new Report:', self.class_name)
 
-        # If a report already exists, we will need to update the report
-        update = None
         if self.iocs is None:
             self.iocs = []
-        if md5 in self.iocs:
-            update = self.iocs.index(md5)
 
         try:
             report = {
@@ -717,7 +708,6 @@ class CarbonBlack:
             self.new_reports.append(report)
             # Keep track of IOCs for deduplication
             self.iocs.append(md5)
-
 
             self.log.info('[%s] Created report', self.class_name)
             self.log.info(report)
@@ -748,9 +738,9 @@ class CarbonBlack:
                 data (dict):    Raw JSON of request to start session if wait is False
         '''
 
-        if isinstance(device_id, int) == False:
+        if isinstance(device_id, int) is False:
             raise TypeError('Expected device_id input type is integer.')
-        if isinstance(wait, bool) == False:
+        if isinstance(wait, bool) is False:
             raise TypeError('Expected wait input type is boolean.')
 
         try:
@@ -846,9 +836,9 @@ class CarbonBlack:
                 data (dict): Raw JSON from response to request if wait is False
         '''
 
-        if isinstance(command, str) == False:
+        if isinstance(command, str) is False:
             raise TypeError('Expected command input type is string.')
-        if argument is not None and isinstance(argument, str) == False:
+        if argument is not None and isinstance(argument, str) is False:
             raise TypeError('Expected argument input type is string or None.')
 
         self.log.info('[%s] Sending command to LR session: {0}'.format(command), self.class_name)
@@ -884,7 +874,6 @@ class CarbonBlack:
 
                 if wait:
                     sleep(1)
-                    lr_command = self.command_status(data['id'])
                     while data['status'] == 'pending':
                         sleep(5)
                         data = self.command_status(data['id'])
@@ -912,7 +901,7 @@ class CarbonBlack:
                 Raw JSON of the response
         '''
 
-        if isinstance(command_id, int) == False:
+        if isinstance(command_id, int) is False:
             raise TypeError('Expected command_id input type is integer.')
 
         self.log.info('[%s] Getting status of LR command: {0}'.format(command_id), self.class_name)
@@ -925,7 +914,8 @@ class CarbonBlack:
 
             self.log.info('[%s] Getting status of command: {0}'.format(command_id), self.class_name)
 
-            url = '{0}/integrationServices/v3/cblr/session/{1}/command/{2}'.format(self.url, self.session_id, command_id)
+            url = '{0}/integrationServices/v3/cblr/session/{1}/command/{2}'.format(self.url, self.session_id,
+                                                                                   command_id)
             headers = {
                 'Content-Type': 'application/json',
                 'X-Auth-Token': '{0}/{1}'.format(self.lr_api_key, self.lr_api_id)
@@ -1060,7 +1050,7 @@ class Database:
                 conn (obj): Returns an object of the connection
         '''
 
-        if isinstance(db_file, str) == False:
+        if isinstance(db_file, str) is False:
             raise TypeError('Expected type of db_file is string.')
 
         self.log.info('[%s] Connecting to database: {0}'.format(db_file), self.class_name)
@@ -1072,7 +1062,8 @@ class Database:
 
             try:
                 self.conn = sqlite3.connect(os.path.join(os.getcwd(), db_file))
-                self.log.info('[%s] Connected to {0} using sqlite {1}'.format(db_file, sqlite3.version), self.class_name)
+                self.log.info('[%s] Connected to {0} using sqlite {1}'.format(db_file, sqlite3.version),
+                              self.class_name)
                 return self.conn
 
             except Exception as err:
@@ -1123,7 +1114,7 @@ class Database:
         '''
 
         if md5 is not None:
-            if isinstance(md5, str) == False:
+            if isinstance(md5, str) is False:
                 raise TypeError('Expected md5 input type is string.')
             if len(md5) != 32:
                 raise ValueError('Expected sha256 to be 64 characters long')
@@ -1132,7 +1123,7 @@ class Database:
             item_type = 'md5'
 
         elif sha256 is not None:
-            if isinstance(sha256, str) == False:
+            if isinstance(sha256, str) is False:
                 raise TypeError('Expected sha256 input type is string.')
             if len(sha256) != 64:
                 raise ValueError('Expected sha256 to be 64 characters long')
@@ -1186,15 +1177,15 @@ class Database:
         if self.conn is None:
             raise Exception('No connection to database')
 
-        if isinstance(md5, str) == False:
+        if isinstance(md5, str) is False:
             raise TypeError('md5 must be a string')
         if len(md5) != 32:
             raise ValueError('md5 must be 32 characters long')
-        if isinstance(sha256, str) == False:
+        if isinstance(sha256, str) is False:
             raise TypeError('sha256 must be a string')
         if len(sha256) != 64:
             raise ValueError('sha256 must be 64 characters long')
-        if isinstance(status, str) == False:
+        if isinstance(status, str) is False:
             raise TypeError('status must be a string')
 
         self.log.info('[%s] Adding file: MD5: {0}'.format(md5), self.class_name)
@@ -1238,20 +1229,20 @@ class Database:
         if self.conn is None:
             raise Exception('No connection to database')
 
-        if isinstance(md5, str) == False:
+        if isinstance(md5, str) is False:
             raise TypeError('md5 must be a string')
         if len(md5) != 32:
             raise ValueError('md5 must be 32 characters long')
-        if isinstance(sha256, str) == False:
+        if isinstance(sha256, str) is False:
             raise TypeError('sha256 must be a string')
         if len(sha256) != 64:
             raise ValueError('sha256 must be 64 characters long')
-        if isinstance(status, str) == False:
+        if isinstance(status, str) is False:
             raise TypeError('status must be a string')
 
         self.log.info('[%s] Updating file: {0}'.format(md5), self.class_name)
 
-        if self.get_file(md5=md5) == None:
+        if self.get_file(md5=md5) is None:
             raise Exception(f'Unable to add file. File doesn\'t exist: {md5}')
 
         timestamp = convert_time('now')
@@ -1286,7 +1277,7 @@ class Database:
             raise Exception('No connection to database')
 
         try:
-            if timestamp is not None and isinstance(timestamp, (str, int)) == False:
+            if timestamp is not None and isinstance(timestamp, (str, int)) is False:
                 raise Exception('Timestamp must be a string, integer, or None')
 
             # Get or set last pull timestamp
@@ -1382,7 +1373,7 @@ class Zscaler:
         except Exception as err:
             self.log.exception(err)
 
-    def start_session(self):
+    def start_zs_session(self):
         '''
             Start a session with Zscaler's API. A request.session() is used to
                 track the JSESSIONID cookie used for susequent API calls.
@@ -1446,7 +1437,7 @@ class Zscaler:
 
         self.log.info('[%s] Checking file: {0}'.format(md5), self.class_name)
 
-        if isinstance(md5, str) == False:
+        if isinstance(md5, str) is False:
             raise TypeError('Expected md5 to be a string')
         if len(md5) != 32:
             raise ValueError('Expected md5 to be a length of 32 characters')
@@ -1460,8 +1451,9 @@ class Zscaler:
                 self.get_quota()
 
             if self.quota['unused'] == 0:
-                self.log.warning('[%s] All queries for the day have been used. Max is {0}'.format(self.quota['allowed']),
-                              self.class_name)
+                allowed = self.quota['allowed']
+                self.log.warning('[%s] All queries for the day have been used. Max is {0}'.format(allowed),
+                                 self.class_name)
                 return False
 
         except Exception as err:
@@ -1529,7 +1521,7 @@ class Zscaler:
         self.log.info('[%s] Getting qouota', self.class_name)
 
         if self.session is None:
-            self.start_session()
+            self.start_zs_session()
 
         try:
             # Get the report
@@ -1575,7 +1567,7 @@ def convert_time(timestamp):
         > Note: All times are treated as GMT
     '''
 
-    if isinstance(timestamp, (str, int)) == False:
+    if isinstance(timestamp, (str, int)) is False:
         raise TypeError('timestamp is expected to be an integer or string.')
 
     try:
@@ -1595,10 +1587,12 @@ def convert_time(timestamp):
         return converted_time
 
     except Exception as err:
-        self.log.exception(err)
+        print(err)
+
 
 def str2bool(item):
     return item.lower() in ['true', '1']
+
 
 ''' Used to track action script executions '''
 script_queue = {}

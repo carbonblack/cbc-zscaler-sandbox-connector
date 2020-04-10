@@ -1,7 +1,4 @@
 requests
-<<<<<<< HEAD
-cbapi
-=======
 cbapi
 
 # Dev dependencies
@@ -9,4 +6,3 @@ flake8
 flake8-docstrings
 coverage
 pytest
->>>>>>> 21d59d784c43c9fae8e285f950b7bca3401ccb6c

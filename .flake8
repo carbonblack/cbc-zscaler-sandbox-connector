@@ -2,3 +2,4 @@
 max-doc-length = 120
 max-line-length = 120
 docstring-convention=google
+ignore = F403,F405

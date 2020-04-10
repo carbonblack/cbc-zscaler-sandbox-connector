@@ -66,7 +66,8 @@ policy =
 
 ; If you want to isolate the host, change to True
 isolate = False
-""" % (cb_url, org_key, api_id, cb_api_key, custom_api_id, custom_api_key, lr_api_id, lr_api_key, z_url, z_api_key, username, password)
+""" % (cb_url, org_key, api_id, cb_api_key, custom_api_id, custom_api_key, lr_api_id, lr_api_key, z_url, z_api_key,
+       username, password)
 
 
 f = open('app/config.conf', 'w')

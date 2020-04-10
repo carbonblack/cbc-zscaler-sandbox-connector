@@ -4,7 +4,6 @@ import sys
 import argparse
 import configparser
 import logging as log
-from time import sleep
 
 from lib.helpers import CarbonBlack
 
@@ -51,7 +50,7 @@ def main():
     #     log.error('[Main] Live Response not enabled on device {0}'.format(device_id))
     #     return 1
 
-    lr_session = cb.start_session(device_id, wait=True)
+    cb.start_session(device_id, wait=True)
 
     log.debug('[Main] Connected to endpoint: {0}'.format(device_id))
 
