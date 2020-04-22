@@ -121,3 +121,27 @@ When this field is populated, the device will be moved to the policy named with 
 | `isolate`           | Isolate the endpoint?              |
 | `policy`            | Policy to move offending devices   |
 
+## Running the Script
+
+The script has the following CLI options:
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      --last_pull LAST_PULL
+                            Set the last pull time in ISO8601 format
+      --cbd                 Pull CBD events
+      --cbth                Pull CBTH processes
+
+The `--last_pull` option overwrites the `last_pull` value stored in the database and will pull Cloud EDR processes since that time.
+
+The `--cbd` and `--cbth` options will pull NGAV events and Cloud EDR processes respectively, even if they are disabled in the configuration file.
+
+### Examples
+
+Typical usage:
+
+    python app.py
+    
+Specify Cloud EDR start date:
+
+    python app.py --last_pull 2020-01-01T12:34:56.000Z
