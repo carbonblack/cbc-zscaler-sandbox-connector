@@ -1,0 +1,43 @@
+- Script runs on a cron (i.e. every 30 minutes)
+	- If CBD is enabled
+		- Get all events from CBD for the last 3 hours
+		- For each event, is the application reputation “NOT_LISTED” (user configurable)?
+			- If yes
+				- Is the hash in the sqlite3 database? Yes?
+					- If hash is in the database, is it bad?
+						- If Zscaler reported it was bad, pull the report again
+						-	Take action
+					-	If hash is not bad
+						-	If last lookup is >30 days
+							- Ask for fresh report
+								- Save report result in database
+							- If hash still not bad
+								- Skip it
+							- If hash is bad
+								- Take action
+				- If the hash is not in the database
+					- Look up the hash in Zscaler sandbox
+						- Save result in database
+						- If the hash is bad
+							- Take action
+	- If CBTH is enabled
+		- Get all processes since the last time the script ran
+		- For each process, is the application reputation “NOT_LISTED”?
+			- If yes
+				- Is the hash in the sqlite3 database? Yes?
+					- If hash is in the database, is it bad?
+						- If Zscaler reported it was bad, pull the report again
+						- Take action
+					- If hash is not bad
+						- If last lookup is >30 days
+							- Ask for fresh report
+								- Save report result in database
+							- If hash still not bad
+								- Skip it
+							- If hash is bad
+								- Take action
+							- If the hash is not in the database
+								- Look up the hash in Zscaler sandbox
+									- Save result in database
+									- If the hash is bad
+										- Take action
