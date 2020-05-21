@@ -1,5 +1,8 @@
 # Zscaler ZIA Sandbox Connector for VMware Carbon Black Cloud
 
+Latest Version: 1.0
+Release Date: 05/21/2020
+
 ## Overview
 
 This is an integration between **Zscaler's ZIA Sandbox** and **VMware Carbon Black Cloud (CBC) Endpoint Standard** and **CBC Enterprise EDR**. While Zscaler can scan all files before they reach the endpoint if they come through the network, what happens when a file comes in via another method, or prior to sensor installation?
@@ -17,6 +20,14 @@ Action options consist of:
     - Python 3.x with sqlite3
     - VMware Carbon Black Cloud Endpoint Standard or Enterprise EDR
     - Zscaler ZIA with licensed Sandbox
+
+## License
+Use of the Carbon Black API is governed by the license found in [LICENSE]().
+
+## Support
+1. View all API and integration offerings on the Developer Network along with reference documentation, video tutorials, and how-to guides.
+2. Use the [Developer Community Forum](https://community.carbonblack.com/) to discuss issues and get answers from other API developers in the Carbon Black Community.
+3. Create a Github issue for bugs and change requests. Formal [Carbon Black Support](http://carbonblack.com/resources/support/) coming with v1.0.
 
 ----
 
