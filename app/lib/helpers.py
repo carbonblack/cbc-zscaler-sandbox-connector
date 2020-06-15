@@ -232,28 +232,30 @@ class CarbonBlack:
                     self.log.exception('[%s] {0} Error: {1}'.format(r.status_code, r.text), self.class_name)
 
                 data = r.json()
-                for event in data['results']:
-                    reputation_filter = self.config['CarbonBlack']['reputation_filter'].split(',')
-                    reputation = event['selectedApp']['effectiveReputation']
-                    # reputation = event['selectedApp']['reputationProperty']
 
-                    # Skip events that are not in the reputation_filter
-                    if reputation_filter is not None and reputation not in reputation_filter:
-                        continue
+                if data['results'] is not None:
+                    for event in data['results']:
+                        reputation_filter = self.config['CarbonBlack']['reputation_filter'].split(',')
+                        reputation = event['selectedApp']['effectiveReputation']
+                        # reputation = event['selectedApp']['reputationProperty']
 
-                    # Update root with things that might be required later
-                    event['md5'] = event['selectedApp']['md5Hash']
-                    event['sha256'] = event['selectedApp']['sha256Hash']
-                    event['device_id'] = event['deviceDetails']['deviceId']
-                    event['pid'] = event['processDetails']['processId']
-                    event['type'] = 'cbd'
+                        # Skip events that are not in the reputation_filter
+                        if reputation_filter is not None and reputation not in reputation_filter:
+                            continue
 
-                    all_events.append(event)
+                        # Update root with things that might be required later
+                        event['md5'] = event['selectedApp']['md5Hash']
+                        event['sha256'] = event['selectedApp']['sha256Hash']
+                        event['device_id'] = event['deviceDetails']['deviceId']
+                        event['pid'] = event['processDetails']['processId']
+                        event['type'] = 'cbd'
 
-                    # Filter unique events
-                    if event['md5'] not in event_tracking:
-                        event_tracking.append(event['md5'])
-                        unique_events.append(event)
+                        all_events.append(event)
+
+                        # Filter unique events
+                        if event['md5'] not in event_tracking:
+                            event_tracking.append(event['md5'])
+                            unique_events.append(event)
 
                 params['start'] = params['start'] + rows
                 total_results = data['totalResults']
