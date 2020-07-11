@@ -154,46 +154,43 @@ def take_action(cb_event, zs_report):
         }
         requests.post(url, headers=headers, json=body)
 
-    # !!! Used for debugging. Limit only to my devices
-    if str(cb_event['device_id']) == '3238121':
+    # Run a script
+    if 'script' in actions and actions['script'] is not None:
+        log.info('[APP.PY] Running Script')
+        device_id = str(cb_event['device_id'])
+        process_id = str(cb_event['pid'])
+        script_cwd = os.path.dirname(os.path.realpath(__file__))
+        stdin = stdout = subprocess.PIPE
 
-        # Run a script
-        if 'script' in actions and actions['script'] is not None:
-            log.info('[APP.PY] Running Script')
-            device_id = str(cb_event['device_id'])
-            process_id = str(cb_event['pid'])
-            script_cwd = os.path.dirname(os.path.realpath(__file__))
-            stdin = stdout = subprocess.PIPE
+        # We only want to run the script once per process
+        if device_id not in script_queue:
+            script_queue[device_id] = []
 
-            # We only want to run the script once per process
-            if device_id not in script_queue:
-                script_queue[device_id] = []
+        if process_id not in script_queue[device_id]:
+            # Replace elements
+            script = config['actions']['script']
+            script = script.replace('{device_id}', device_id)
+            script = script.replace('{command}', 'kill')
+            script = script.replace('{argument}', process_id)
+            script = script.split(' ')
 
-            if process_id not in script_queue[device_id]:
-                # Replace elements
-                script = config['actions']['script']
-                script = script.replace('{device_id}', device_id)
-                script = script.replace('{command}', 'kill')
-                script = script.replace('{argument}', process_id)
-                script = script.split(' ')
+            cmd = [os.path.join(script_cwd, script[0])]
+            args = script[1:]
 
-                cmd = [os.path.join(script_cwd, script[0])]
-                args = script[1:]
+            log.info('[APP.PY] {0} {0}'.format(cmd, args))
 
-                log.info('[APP.PY] {0} {0}'.format(cmd, args))
+            script_queue[device_id].append(process_id)
+            # !!! do i need stdout and stdin?
+            log.info('[APP.PY] Running action script: {0} {1}'.format(cmd, args))
+            subprocess.Popen(cmd + args, stdout=stdout, stdin=stdin)
 
-                script_queue[device_id].append(process_id)
-                # !!! do i need stdout and stdin?
-                log.info('[APP.PY] Running action script: {0} {1}'.format(cmd, args))
-                subprocess.Popen(cmd + args, stdout=stdout, stdin=stdin)
+    # Isolate endpoint
+    if 'isolate' in actions and actions['isolate'].lower() in ['true', '1']:
+        cb.isolate_device(cb_event['device_id'])
 
-        # Isolate endpoint
-        if 'isolate' in actions and actions['isolate'].lower() in ['true', '1']:
-            cb.isolate_device(cb_event['device_id'])
-
-        # Change device's policy
-        if 'policy' in actions and actions['policy'] is not None:
-            cb.update_policy(cb_event['device_id'], actions['policy'])
+    # Change device's policy
+    if 'policy' in actions and actions['policy'] is not None:
+        cb.update_policy(cb_event['device_id'], actions['policy'])
 
 
 def process_events(events):
