@@ -43,13 +43,6 @@ def main():
     command = args.command
     process_id = args.argument
 
-    # device = cb.get_device(device_id)
-    # device.refresh()
-    # print(dir(device))
-    # if 'LIVE_RESPONSE_ENABLED' not in device.original_document['sensorStates']:
-    #     log.error('[Main] Live Response not enabled on device {0}'.format(device_id))
-    #     return 1
-
     cb.start_session(device_id, wait=True)
 
     log.debug('[Main] Connected to endpoint: {0}'.format(device_id))
@@ -59,8 +52,6 @@ def main():
 
     for process in lr_command['processes']:
         if str(process['pid']) == process_id:
-            # !! Make sure the process names match as well
-
             # Send kill command
             lr_command = cb.send_command(command, argument=process_id, wait=True)
 
