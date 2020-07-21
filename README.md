@@ -57,7 +57,7 @@ You will need to create 1 API Access Level and 3 API keys
 | Custom Detections    | Feeds               | org.feeds           | :ballot_box_with_check: | :ballot_box_with_check: | :ballot_box_with_check: |        |         |
 | Device               | General Information | device              |                    | :ballot_box_with_check: |                    |        |         |
 | Device               | Policy assignment   | device.policy       |                    |                    | :ballot_box_with_check: |        |         |
-| Search.              | Events              | org.search.events.  | :ballot_box_with_check: | :ballot_box_with_check: |                    |        |         |
+| Search               | Events              | org.search.events.  | :ballot_box_with_check: | :ballot_box_with_check: |                    |        |         |
 | Unified Binary Store | SHA-256             | ubs.org.sha256      |                    | :ballot_box_with_check: |                    |        |         |
 
 #### Access Levels (API key type)
