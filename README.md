@@ -116,7 +116,7 @@ When this field is populated, a POST request is made to the http endpoint provid
 #### script
 When this field is populated, a script is executed at the path and with the parameters provided in the value of the configuration. There are 3 find/replace that occur (`{device_id}`, `{command}`, `{argument}`).
 
-An example is provided in the [`config.conf`](). This will execute the provided example [action.py]() which will kill the triggered process.
+An example is provided in the [`config.conf`](https://github.com/carbonblack/cbc-zscaler-sandbox-connector/blob/master/app/config.conf). This will execute the provided example [action.py](https://github.com/carbonblack/cbc-zscaler-sandbox-connector/blob/master/app/action.py) which will kill the triggered process.
 
 #### isolate
 When this field is populated with `true` the device will be isolated.
