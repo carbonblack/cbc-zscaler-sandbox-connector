@@ -767,7 +767,6 @@ class CarbonBlack:
                     while data['status'] == 'PENDING':
                         sleep(15)
                         data = self.get_session()
-                        print(json.dumps(data, indent=4))
 
                 return data
 
