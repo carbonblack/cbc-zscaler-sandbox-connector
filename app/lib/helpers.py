@@ -12,11 +12,11 @@ import requests
 
 
 # Import CBC Basics
-from cbapi.psc import CbPSCBaseAPI
+from cbapi.psc import CbPSCBaseAPI, Device
 
 # Import Defense
 from cbapi.psc.defense import CbDefenseAPI
-from cbapi.psc.defense.models import Device, Policy
+from cbapi.psc.defense.models import Policy
 
 # Import ThreatHunter
 from cbapi.psc.threathunter import CbThreatHunterAPI
@@ -147,7 +147,7 @@ class CarbonBlack:
             raise TypeError('Expected policy_name input type is string.')
 
         try:
-            device = self.cbd.select(Device, device_id)
+            device = self.get_device(device_id)
             policies = self.cbd.select(Policy)
             for policy in policies:
                 if policy.name == policy_name:
