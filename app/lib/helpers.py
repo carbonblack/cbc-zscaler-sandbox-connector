@@ -393,36 +393,32 @@ class CarbonBlack:
                     self.log.info('[%s] Process is missing MD5 and SHA256. Skipping.', self.class_name)
                     continue
 
-                # Sometimes we only have 1 hash type
-                if len(raw_proc['process_hash']) == 1:
-                    # If it is an MD5
-                    if len(raw_proc['process_hash'][0]) == 32:
-                        self.log.info('[%s] Process is missing the SHA256', self.class_name)
-                        raw_proc['md5'] = raw_proc['process_hash'][0]
+                for process_hash in raw_proc['process_hash']:
+                    # If it has an MD5
+                    if len(process_hash) == 32:
+                        raw_proc['md5'] = process_hash
 
-                        # If we are tracking the hash, use it's value
-                        if raw_proc['md5'] in hash_tracker.keys():
-                            raw_proc['sha256'] = hash_tracker[raw_proc['md5']]
+                    # If it has a sha256
+                    if len(process_hash) == 64:
+                        raw_proc['sha256'] = process_hash
 
-                        # Otherwise fill with 0's
-                        else:
-                            raw_proc['sha256'] = '0' * 64
-
-                    # If we only have the sha256
-                    else:
-                        self.log.info('[%s] Process is missing the MD5', self.class_name)
-                        raw_proc['sha256'] = raw_proc['process_hash'][0]
-
+                    if 'md5' not in raw_proc:
                         # If we are tracking the sha256, grab the md5
                         if raw_proc['sha256'] in hash_tracker.values():
                             md5s = hash_tracker.keys()
                             sha256s = hash_tracker.values()
                             raw_proc['md5'] = list(md5s)[list(sha256s).index(raw_proc['sha256'])]
 
-                        # If we aren't tracking the sha256
-                        else:
+                    if 'sha256' not in raw_proc:
+                        # If we are tracking the md5, grab the sha256
+                        if raw_proc['md5'] in hash_tracker.keys():
+                            raw_proc['sha256'] = hash_tracker[raw_proc['md5']]
+
+                    # Check again to see if we have the md5
+                    if 'md5' not in raw_proc:
+                        if 'sha256' in raw_proc and raw_proc['sha256'] != (0 * 64):
                             # Get the metadata. Sometimes that has the md5
-                            metadata = self.get_metadata(raw_proc['process_hash'][0])
+                            metadata = self.get_metadata(raw_proc['sha256'])
 
                             # If it has the md5, save it
                             if metadata is not None:
@@ -432,11 +428,6 @@ class CarbonBlack:
                             else:
                                 self.log.info('[%s] Unable to get file metadata. Skipping.', self.class_name)
                                 continue
-
-                # Usually we have both hashes
-                if len(raw_proc['process_hash']) == 2:
-                    raw_proc['md5'] = raw_proc['process_hash'][0]
-                    raw_proc['sha256'] = raw_proc['process_hash'][1]
 
                 # Track the hashes to prevent redundant API lookups
                 if raw_proc['md5'] not in hash_tracker.keys():
