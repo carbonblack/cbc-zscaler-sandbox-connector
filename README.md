@@ -1,7 +1,8 @@
 # Zscaler ZIA Sandbox Connector for VMware Carbon Black Cloud
 
-Latest Version: 1.0
-Release Date: 05/21/2020
+**Latest Version:** 1.0
+
+**Release Date:** 05/21/2020
 
 ## Overview
 
