@@ -5,6 +5,8 @@ Release Date: 05/21/2020
 
 ## Overview
 
+This connector will no longer receive updates because it requires the Events v3 API that will be deactivated on January 31st, 2022. Once the API is deactivated, event data from Endpoint Standard will no longer be available in ZScaler through this integration.  Message us if you have questions or concerns.  More information on the API Deactivation can be found on the [Carbon Black Commmunity](https://community.carbonblack.com/t5/Developer-Relations/Upcoming-API-shutdowns-Carbon-Black-Cloud-v3-Events-Alerts-and/m-p/107722#M2727).
+
 This is an integration between **Zscaler's ZIA Sandbox** and **VMware Carbon Black Cloud (CBC) Endpoint Standard** and **CBC Enterprise EDR**. While Zscaler can scan all files before they reach the endpoint if they come through the network, what happens when a file comes in via another method, or prior to sensor installation?
 
 The connector will scan for any CBC Enterprise Standard events or CBC Enterprise EDR processes. After pulling the processes it checks all of the unique hashes against a database of files that have been checked in the past. If the file is not known, a request to Zscaler's ZIA Sandbox is made to see if they have any information on it. If they do, or if the file is known bad from the local database, action is taken.
