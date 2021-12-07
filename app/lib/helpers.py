@@ -55,12 +55,16 @@ class CarbonBlack:
             self.cust_api_key = config['CarbonBlack']['custom_api_key']
             self.lr_api_id = config['CarbonBlack']['lr_api_id']
             self.lr_api_key = config['CarbonBlack']['lr_api_key']
+            integration_name = 'CBC - Zscaler Sandbox Connector / v1.1 / Ryan Fortress (rfortress@vmware.com)'
             self.cb = CbPSCBaseAPI(url=self.url, org_key=self.org_key,
-                                   token='{0}/{1}'.format(self.cust_api_key, self.cust_api_id))
+                                   token='{0}/{1}'.format(self.cust_api_key, self.cust_api_id),
+                                   integration_name=integration_name)
             self.cbd = CbDefenseAPI(url=self.url, org_key=self.org_key,
-                                    token='{0}/{1}'.format(self.api_key, self.api_id))
+                                    token='{0}/{1}'.format(self.api_key, self.api_id),
+                                    integration_name=integration_name)
             self.cbth = CbThreatHunterAPI(url=self.url, org_key=self.org_key,
-                                          token='{0}/{1}'.format(self.cust_api_key, self.cust_api_id))
+                                          token='{0}/{1}'.format(self.cust_api_key, self.cust_api_id),
+                                          integration_name=integration_name)
             # self.minimum_severity = int(config['CarbonBlack']['minimum_severity'])
             self.time_bounds = None
             self.device_id = None
@@ -156,6 +160,142 @@ class CarbonBlack:
                     return device
 
             return None
+
+        except Exception as err:
+            self.log.exception(err)
+
+    def get_available_span(self):
+        '''
+            Gets the available data timeframes in CBC
+
+            Inputs: None
+
+            Output:
+                The JSON response of the request
+        '''
+
+        self.log.info('[%s] Getting available data timespan', self.class_name)
+
+        try:
+            endpoint = '{url}/api/investigate/v1/orgs/{org_key}/processes/limits'.format(url=self.url,
+                                                                                             org_key=self.org_key)
+            headers = {
+                'X-Auth-Token': '{api_key}/{api_id}'.format(api_key=self.cust_api_key, api_id=self.cust_api_id)
+            }
+            r = requests.get(url=endpoint, headers=headers)
+            if r.status_code == 200:
+                data = r.json()['time_bounds']
+
+                self.log.info('[%s] Available time range is from {0} to {1}'.format(convert_time(data['lower']),
+                                                                                    convert_time(data['upper'])),
+                              self.class_name)
+
+                self.time_bounds = data
+
+                return data
+
+            else:
+                raise Exception(f'{r.status_code} {r.text}')
+
+        except Exception as err:
+            self.log.exception(err)
+
+    def get_processes(self, query, db, unique=False):
+        '''
+            Get process search results from CBC
+
+            Inputs
+                query (str):    the query to be submitted
+                db (obj):       the database object for checking for duplicates
+                unique (bool):  return only unique hashes? [optional]
+
+            Raises
+                TypeError if query is not a string
+                TypeError if db is not an object
+                TypeError if unique is not a boolean
+
+            Outputs
+                Returns a list of processes (list of dicts)
+        '''
+
+        if isinstance(query, str) is False:
+            raise TypeError('Expected query input type is string.')
+        if isinstance(db, object) is False:
+            raise TypeError('Expected db input type is object.')
+        if isinstance(unique, bool) is False:
+            raise TypeError('Expected unique input type is boolean.')
+
+        self.log.info('[%s] Getting processes: "{0}"'.format(query), self.class_name)
+
+        try:
+            all_procs = []
+            unique_procs = []
+            hash_tracker = {}
+
+            processes = self.cbth.select(Process).where(query).sort_by('device_timestamp', 'DESC')
+
+            for process in processes:
+                # Get the raw JSON
+                raw_proc = process.original_document
+                raw_proc['pid'] = raw_proc['process_pid'][0]
+
+                # Sometimes we don't have a hash. Skip these
+                if 'process_hash' not in raw_proc:
+                    self.log.info('[%s] Process is missing MD5 and SHA256. Skipping.', self.class_name)
+                    continue
+
+                for process_hash in raw_proc['process_hash']:
+                    # If it has an MD5
+                    if len(process_hash) == 32:
+                        raw_proc['md5'] = process_hash
+
+                    # If it has a sha256
+                    if len(process_hash) == 64:
+                        raw_proc['sha256'] = process_hash
+
+                    if 'md5' not in raw_proc:
+                        # If we are tracking the sha256, grab the md5
+                        if raw_proc['sha256'] in hash_tracker.values():
+                            md5s = hash_tracker.keys()
+                            sha256s = hash_tracker.values()
+                            raw_proc['md5'] = list(md5s)[list(sha256s).index(raw_proc['sha256'])]
+
+                    if 'sha256' not in raw_proc:
+                        # If we are tracking the md5, grab the sha256
+                        if raw_proc['md5'] in hash_tracker.keys():
+                            raw_proc['sha256'] = hash_tracker[raw_proc['md5']]
+
+                    # Check again to see if we have the md5
+                    if 'md5' not in raw_proc:
+                        if 'sha256' in raw_proc and raw_proc['sha256'] != (0 * 64):
+                            # Get the metadata. Sometimes that has the md5
+                            metadata = self.get_metadata(raw_proc['sha256'])
+
+                            # If it has the md5, save it
+                            if metadata is not None:
+                                raw_proc['md5'] = metadata['md5']
+
+                            # Since Zscaler Sandbox requires an md5, skip if we can't find the md5
+                            else:
+                                self.log.info('[%s] Unable to get file metadata. Skipping.', self.class_name)
+                                continue
+
+                # Track the hashes to prevent redundant API lookups
+                if 'md5' in raw_proc:
+                    if raw_proc['md5'] not in hash_tracker.keys():
+                        hash_tracker[raw_proc['md5']] = raw_proc['sha256']
+
+                # Save the process
+                all_procs.append(raw_proc)
+
+                # Filter out things we already checked
+                if raw_proc['sha256'] not in unique_procs:
+                    unique_procs.append(raw_proc)
+
+            self.log.info('[%s] Found {0} unique processes'.format(len(unique_procs)), self.class_name)
+            if unique:
+                return unique_procs
+            return all_procs
 
         except Exception as err:
             self.log.exception(err)
@@ -312,142 +452,6 @@ class CarbonBlack:
     # CBC Enterprise EDR
     #
 
-    def get_available_span(self):
-        '''
-            Gets the available data timeframes in CBC.
-
-            Inputs: None
-
-            Output:
-                The JSON response of the request
-        '''
-
-        self.log.info('[%s] Getting available data timespan', self.class_name)
-
-        try:
-            endpoint = '{url}/threathunter/search/v1/orgs/{org_key}/processes/limits'.format(url=self.url,
-                                                                                             org_key=self.org_key)
-            headers = {
-                'X-Auth-Token': '{api_key}/{api_id}'.format(api_key=self.api_key, api_id=self.api_id)
-            }
-            r = requests.get(url=endpoint, headers=headers)
-            if r.status_code == 200:
-                data = r.json()['time_bounds']
-
-                self.log.info('[%s] Available time range is from {0} to {1}'.format(convert_time(data['lower']),
-                                                                                    convert_time(data['upper'])),
-                              self.class_name)
-
-                self.time_bounds = data
-
-                return data
-
-            else:
-                raise Exception(f'{r.status_code} {r.text}')
-
-        except Exception as err:
-            self.log.exception(err)
-
-    def get_processes(self, query, db, unique=False):
-        '''
-            Get process search results from CBC Enterprise EDR
-
-            Inputs
-                query (str):    the query to be submitted
-                db (obj):       the database object for checking for duplicates
-                unique (bool):  return only unique hashes? [optional]
-
-            Raises
-                TypeError if query is not a string
-                TypeError if db is not an object
-                TypeError if unique is not a boolean
-
-            Outputs
-                Returns a list of processes (list of dicts)
-        '''
-
-        if isinstance(query, str) is False:
-            raise TypeError('Expected query input type is string.')
-        if isinstance(db, object) is False:
-            raise TypeError('Expected db input type is object.')
-        if isinstance(unique, bool) is False:
-            raise TypeError('Expected unique input type is boolean.')
-
-        self.log.info('[%s] Getting processes: "{0}"'.format(query), self.class_name)
-
-        try:
-            all_procs = []
-            unique_procs = []
-            hash_tracker = {}
-
-            processes = self.cbth.select(Process).where(query).sort_by('device_timestamp', 'DESC')
-
-            for process in processes:
-                # Get the raw JSON
-                raw_proc = process.original_document
-                raw_proc['type'] = 'cbth'
-                raw_proc['pid'] = raw_proc['process_pid'][0]
-
-                # Sometimes we don't have a hash. Skip these
-                if 'process_hash' not in raw_proc:
-                    self.log.info('[%s] Process is missing MD5 and SHA256. Skipping.', self.class_name)
-                    continue
-
-                for process_hash in raw_proc['process_hash']:
-                    # If it has an MD5
-                    if len(process_hash) == 32:
-                        raw_proc['md5'] = process_hash
-
-                    # If it has a sha256
-                    if len(process_hash) == 64:
-                        raw_proc['sha256'] = process_hash
-
-                    if 'md5' not in raw_proc:
-                        # If we are tracking the sha256, grab the md5
-                        if raw_proc['sha256'] in hash_tracker.values():
-                            md5s = hash_tracker.keys()
-                            sha256s = hash_tracker.values()
-                            raw_proc['md5'] = list(md5s)[list(sha256s).index(raw_proc['sha256'])]
-
-                    if 'sha256' not in raw_proc:
-                        # If we are tracking the md5, grab the sha256
-                        if raw_proc['md5'] in hash_tracker.keys():
-                            raw_proc['sha256'] = hash_tracker[raw_proc['md5']]
-
-                    # Check again to see if we have the md5
-                    if 'md5' not in raw_proc:
-                        if 'sha256' in raw_proc and raw_proc['sha256'] != (0 * 64):
-                            # Get the metadata. Sometimes that has the md5
-                            metadata = self.get_metadata(raw_proc['sha256'])
-
-                            # If it has the md5, save it
-                            if metadata is not None:
-                                raw_proc['md5'] = metadata['md5']
-
-                            # Since Zscaler Sandbox requires an md5, skip if we can't find the md5
-                            else:
-                                self.log.info('[%s] Unable to get file metadata. Skipping.', self.class_name)
-                                continue
-
-                # Track the hashes to prevent redundant API lookups
-                if raw_proc['md5'] not in hash_tracker.keys():
-                    hash_tracker[raw_proc['md5']] = raw_proc['sha256']
-
-                # Save the process
-                all_procs.append(raw_proc)
-
-                # Filter out things we already checked
-                if raw_proc['sha256'] not in unique_procs:
-                    unique_procs.append(raw_proc)
-
-            self.log.info('[%s] Found {0} unique processes'.format(len(unique_procs)), self.class_name)
-            if unique:
-                return unique_procs
-            return all_procs
-
-        except Exception as err:
-            self.log.exception(err)
-
     def get_metadata(self, sha256):
         '''
             Pulls the metadata for a file. Sometimes the MD5 of a process
@@ -478,8 +482,8 @@ class CarbonBlack:
                                                                                      org_key=self.org_key,
                                                                                      sha256=sha256)
             headers = {
-                'X-Auth-Token': '{api_key}/{api_id}'.format(api_key=self.api_key,
-                                                            api_id=self.api_id),
+                'X-Auth-Token': '{api_key}/{api_id}'.format(api_key=self.cust_api_key,
+                                                            api_id=self.cust_api_id),
                 'Content-Type': 'application/json'
             }
             r = requests.get(url=endpoint, headers=headers)

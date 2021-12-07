@@ -1,7 +1,7 @@
 # Zscaler ZIA Sandbox Connector for VMware Carbon Black Cloud
 
-Latest Version: 1.0
-Release Date: 05/21/2020
+Latest Version: v1.1
+Release Date: 12/06/2021
 
 ## Overview
 
@@ -55,9 +55,10 @@ You will need to create 1 API Access Level and 3 API keys
 |       Category       |   Permission Name   |    .Notation Name   |       Create       |        Read        |       Update       | Delete | Execute |
 |:--------------------|:-------------------|:-------------------|:------------------:|:------------------:|:------------------:|:------:|:-------:|
 | Custom Detections    | Feeds               | org.feeds           | :ballot_box_with_check: | :ballot_box_with_check: | :ballot_box_with_check: |        |         |
+| Device               | Quarantine          | device.quarantine   |                    |  |                    |        | :ballot_box_with_check: |
 | Device               | General Information | device              |                    | :ballot_box_with_check: |                    |        |         |
 | Device               | Policy assignment   | device.policy       |                    |                    | :ballot_box_with_check: |        |         |
-| Search               | Events              | org.search.events.  | :ballot_box_with_check: | :ballot_box_with_check: |                    |        |         |
+| Search               | Events              | org.search.events   | :ballot_box_with_check: | :ballot_box_with_check: |                    |        |         |
 | Unified Binary Store | SHA-256             | ubs.org.sha256      |                    | :ballot_box_with_check: |                    |        |         |
 
 #### Access Levels (API key type)
@@ -156,3 +157,8 @@ Typical usage:
 Specify Cloud EDR start date:
 
     python app.py --last_pull 2020-01-01T12:34:56.000Z
+
+### Changelog
+
+05/06/2020 - Initial release
+12/06/2021 - Updated to support API changes. Now uses Platform APIs instead of product specific APIs.

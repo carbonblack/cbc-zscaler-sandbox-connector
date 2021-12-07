@@ -34,26 +34,26 @@ def init():
 
     global config, db, cb, zs
 
+    app_path = os.path.dirname(os.path.realpath(__file__))
+    config_path = os.path.join(app_path, 'config.conf')
+    if os.path.isfile(config_path) is False:
+        raise Exception('\n\n[APP.PY] Unable to find config.conf in {0}'.format(app_path))
+
     # Get setting from config.ini
     config = configparser.ConfigParser()
-    config.read('config.conf')
+    config.read(config_path)
 
     # Configure logging
-    log.basicConfig(filename=config['logging']['filename'], format='[%(asctime)s] <pid:%(process)d> %(message)s',
-                    level=log.DEBUG)
-    log.info('[APP.PY] Sarted Zscaler ZIA Sandbox Connector for VMware Carbon Black Cloud')
+    level = log.getLevelName(config['logging']['log_level'])
+    log_path = os.path.join(app_path, config['logging']['filename'])
+    log.basicConfig(filename=log_path, format='[%(asctime)s] %(levelname)s <pid:%(process)d> %(message)s', level=level)
+
+    log.info('\n\n[APP.PY] Sarted Zscaler ZIA Sandbox Connector for VMware Carbon Black Cloud')
 
     # Configure CLI input arguments
     parser = argparse.ArgumentParser(description='Get events / processes from VMware Carbon Black Cloud')
     parser.add_argument('--last_pull', help='Set the last pull time in ISO8601 format')
-    parser.add_argument('--cbd', action='store_true', default=False, help='Pull CBD events')
-    parser.add_argument('--cbth', action='store_true', default=False, help='Pull CBTH processes')
     args = parser.parse_args()
-
-    log.debug(args.cbd)
-    if args.cbd or args.cbth:
-        config['CarbonBlack']['cbd_enabled'] = str(args.cbd)
-        config['CarbonBlack']['cbth_enabled'] = str(args.cbth)
 
     # Init database
     db = Database(config, log)
@@ -72,7 +72,20 @@ def init():
 
 def take_action(cb_event, zs_report):
     '''
-        comment coming soon...
+        Takes action on endpoints and processes with hashes that returned malicious results from
+          Zscaler's sandbox.
+
+        Inputs:
+            cb_event: The processes that was identified to have the malicious hash
+            zs_report: The report of the hash from Zscaler's sandbox
+        
+        Outputs:
+            The actions are enabled or disabled in the config file.
+            watchlist: Adds the hash to a watchlist
+            webhook: Triggers a HTTP POST to a URL with the process, report and hash
+            script: Executes a script
+            isolate: Isolates the endpoint
+            policy: Changes the device to the policy specified
     '''
 
     # Populate actions with either None or the action defined
@@ -208,16 +221,12 @@ def process_events(events):
 
     for event in events:
 
-        # for testing CBD hash issues
-        # if 'eventId' in event:
-        #     log.debug('[!!!] Event: {0}'.format(json.dumps(event, indent=4)))
-        #     log.debug('[!!!] EventID: {0}'.format(event['eventId']))
-        #     log.debug('[!!!] MD5: {0}'.format(event['md5']))
-        #     log.debug('[!!!] SHA256: {0}'.format(event['sha256']))
-
         # Sometimes CBD is missing the MD5. Not much we can do about it, so skip these.
+        if 'md5' not in event:
+            event['md5'] = None
+
         if event['md5'] is None:
-            log.debug('[!!!] Missing MD5: {0}'.format(json.dumps(event, indent=4)))
+            log.debug('[APP.PY] Missing MD5: {0}'.format(json.dumps(event, indent=4)))
             continue
 
         # Check to see if we know about this file in the database
@@ -269,9 +278,10 @@ def process_events(events):
     return
 
 
-def get_cbth_processes():
+def get_processes():
     '''
-        comment comming soon...
+        Uses the Platform APIs to pull all processes matching the criteria defined in the
+            config file.
     '''
     # Get the start and end times
     # Start time comes from the datbase's last_pull time
@@ -305,23 +315,11 @@ def main():
     # Get inits
     init()
 
-    cbth_enabled = str2bool(config['CarbonBlack']['cbth_enabled'])
-    cbd_enabled = str2bool(config['CarbonBlack']['cbd_enabled'])
+    # Get CBTH processes since the last run
+    events = get_processes()
 
-    if cbth_enabled:
-        # Get CBTH processes since the last run
-        events = get_cbth_processes()
-
-        # Process events
-        process_events(events)
-
-    if cbd_enabled:
-        # Get CBD events for the last 3h
-        timespan = config['CarbonBlack']['cbd_timespan']
-        events = cb.get_events(timespan=timespan)
-
-        # Process events
-        process_events(events)
+    # Process events
+    process_events(events)
 
     # If watchlists are enabled in take_action() and there were bad files, update the watchlist
     if cb.new_reports is not None and len(cb.new_reports):
