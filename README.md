@@ -160,5 +160,5 @@ Specify Cloud EDR start date:
 
 ### Changelog
 
-05/06/2020 - Initial release
+05/06/2020 - Initial release  
 12/06/2021 - Updated to support API changes. Now uses Platform APIs instead of product specific APIs.
