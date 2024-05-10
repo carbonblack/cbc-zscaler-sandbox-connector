@@ -1,6 +1,7 @@
-- name: linters
-  service: testing
-  command: bin/linter.sh
-- name: tests
-  service: testing
-  command: bin/run_tests.sh
+# Removing codeship steps as this project is no longer maintained
+##- name: linters
+#  service: testing
+#  command: bin/linter.sh
+#- name: tests
+#  service: testing
+#  command: bin/run_tests.sh
