@@ -1,4 +1,6 @@
-# Zscaler ZIA Sandbox Connector for VMware Carbon Black Cloud
+# DEPRECATED: Zscaler ZIA Sandbox Connector for VMware Carbon Black Cloud
+
+This integration is deprecated and no longer maintained.
 
 Latest Version: v1.1
 Release Date: 12/06/2021
@@ -25,9 +27,7 @@ Action options consist of:
 Use of the Carbon Black API is governed by the license found in [LICENSE]().
 
 ## Support
-1. View all API and integration offerings on the Developer Network along with reference documentation, video tutorials, and how-to guides.
-2. Use the [Developer Community Forum](https://community.carbonblack.com/) to discuss issues and get answers from other API developers in the Carbon Black Community.
-3. Create a Github issue for bugs and change requests. Formal [Carbon Black Support](http://carbonblack.com/resources/support/) coming with v1.0.
+1. This integration is no longer supported. However, as an open source project is able to be extended by interested users.
 
 ----
 
@@ -62,6 +62,9 @@ You will need to create 1 API Access Level and 3 API keys
 | Unified Binary Store | SHA-256             | ubs.org.sha256      |                    | :ballot_box_with_check: |                    |        |         |
 
 #### Access Levels (API key type)
+
+**Note:** Without changes, Live Response will cease working on July 31st 2024 when the API is deactivated in Carbon Black Cloud.
+
 1. API
 2. Custom [Select your Custom Access Level]
 3. Live Response (optional, used in action.py)
@@ -162,3 +165,4 @@ Specify Cloud EDR start date:
 
 05/06/2020 - Initial release  
 12/06/2021 - Updated to support API changes. Now uses Platform APIs instead of product specific APIs.
+05/10/2024 - Marked Deprecated
