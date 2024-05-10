@@ -1,6 +1,6 @@
 # DEPRECATED: Zscaler ZIA Sandbox Connector for VMware Carbon Black Cloud
 
-This integration is deprecated and no longer maintained. Please contact support if you are interested in this integration.
+This integration is deprecated and no longer maintained.
 
 Latest Version: v1.1
 Release Date: 12/06/2021
